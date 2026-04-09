@@ -17,7 +17,7 @@ class StockService
      */
     public function list(ListStockDto $dto): array|Collection
     {
-        $query = Stock::query()->with(['depot', 'lot']);
+        $query = Stock::query()->with(['depot','stockStatus']);
 
         if ($dto->name !== null) {
             $query->filterByName($dto->name);
@@ -119,5 +119,9 @@ class StockService
         $stock->load(['depot', 'lot']);
 
         return $stock;
+    }
+    public function importStock(ImportStockRequest $request)
+    {
+
     }
 }

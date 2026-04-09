@@ -17,8 +17,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             ProfileSeeder::class,
             UserSeeder::class,
-            LotStatusSeeder::class,
-            LotSeeder::class,
+            StockStatusSeeder::class,
             DepotSeeder::class,
             StockSeeder::class,
             DepotHistoriqueSeeder::class,

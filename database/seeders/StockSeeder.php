@@ -3,8 +3,8 @@
 namespace Database\Seeders;
 
 use App\Models\Depot;
-use App\Models\Lot;
 use App\Models\Stock;
+use App\Models\StockStatus;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 
@@ -13,48 +13,56 @@ class StockSeeder extends Seeder
     public function run(): void
     {
         $userId = User::query()->orderBy('id')->value('id');
-        $lotIds = Lot::query()->orderBy('id')->pluck('id')->all();
         $depotIds = Depot::query()->orderBy('id')->pluck('id')->all();
-
-        if ($lotIds === []) {
-            $this->command?->warn('StockSeeder: aucun lot — exécutez LotSeeder avant.');
-
-            return;
-        }
+        $stockStatusIds = StockStatus::query()->orderBy('id')->pluck('id')->all();
 
         $marques = ['Renault', 'Peugeot', 'Dacia', 'Citroën'];
         $modeles = ['Clio', '208', 'Sandero', 'C3', 'Megane', '3008'];
+        $clients = ['Auto Hall', 'Sopriam', 'M-Automotive', 'Particulier'];
         $colorsEx = ['Blanc Nacré', 'Gris Platine', 'Noir Métal', 'Bleu Iron'];
         $colorsExCodes = ['#f3f3ee', '#b0b4b9', '#252525', '#4f6f94'];
         $colorsIn = ['Tissu gris', 'Cuir noir', 'Tissu noir'];
         $colorsInCodes = ['#8f959e', '#1c1c1c', '#252525'];
 
         $n = 0;
-        foreach ($lotIds as $lotIndex => $lotId) {
-            $count = $lotIndex === 0 ? 6 : 4;
-            for ($k = 0; $k < $count; $k++) {
-                $n++;
-                $vin = $this->fakeVin($n);
-                $depotId = $depotIds !== [] ? $depotIds[($n - 1) % count($depotIds)] : null;
+        for ($k = 0; $k < 20; $k++) {
+            $n++;
+            $vin = $this->fakeVin($n);
+            $depotId = $depotIds !== [] ? $depotIds[($n - 1) % count($depotIds)] : null;
+            $statusId = $stockStatusIds !== [] ? $stockStatusIds[($n - 1) % count($stockStatusIds)] : null;
 
-                Stock::updateOrCreate(
-                    ['vin' => $vin],
-                    [
-                        'modele' => $modeles[($n - 1) % count($modeles)],
-                        'version' => 'Intens',
-                        'marque' => $marques[($n - 1) % count($marques)],
-                        'color_ex' => $colorsEx[($n - 1) % count($colorsEx)],
-                        'color_ex_code' => $colorsExCodes[($n - 1) % count($colorsExCodes)],
-                        'color_int' => $colorsIn[($n - 1) % count($colorsIn)],
-                        'color_int_code' => $colorsInCodes[($n - 1) % count($colorsInCodes)],
-                        'reserved' => $n % 7 === 0,
-                        'depot_id' => $depotId,
-                        'lot_id' => $lotId,
-                        'created_by' => $userId,
-                        'updated_by' => $userId,
-                    ]
-                );
-            }
+            Stock::updateOrCreate(
+                ['vin' => $vin],
+                [
+                    'modele' => $modeles[($n - 1) % count($modeles)],
+                    'version' => 'Intens',
+                    'marque' => $marques[($n - 1) % count($marques)],
+                    'numero_commande' => 'CMD-'.str_pad((string) $n, 5, '0', STR_PAD_LEFT),
+                    'client' => $clients[($n - 1) % count($clients)],
+                    'type_client' => $n % 4 === 0 ? 'Particulier' : 'Société',
+                    'PGEO' => 'PGEO-'.str_pad((string) (($n % 9) + 1), 2, '0', STR_PAD_LEFT),
+                    'finition' => 'Intens',
+                    'color_ex' => $colorsEx[($n - 1) % count($colorsEx)],
+                    'color_ex_code' => $colorsExCodes[($n - 1) % count($colorsExCodes)],
+                    'color_int' => $colorsIn[($n - 1) % count($colorsIn)],
+                    'color_int_code' => $colorsInCodes[($n - 1) % count($colorsInCodes)],
+                    'options' => 'Pack Vision, GPS, Jantes 17"',
+                    'vendeur' => 'Vendeur '.(($n % 6) + 1),
+                    'site_affecte' => 'Site '.(($n % 3) + 1),
+                    'date_creation_commande' => now()->subDays(($n % 60) + 1)->toDateString(),
+                    'reserved' => $n % 7 === 0,
+                    'depot_id' => $depotId,
+                    'stock_status_id' => $statusId,
+                    'date_arrivage_prevu' => now()->addDays(($n % 45) + 1)->toDateString(),
+                    'date_arrivage_reelle' => $n % 5 === 0 ? now()->subDays($n % 10)->toDateString() : null,
+                    'date_affectation' => $n % 4 === 0 ? now()->subDays($n % 8)->toDateString() : null,
+                    'numero_lot' => 'LOT-2026-'.str_pad((string) (($n % 7) + 1), 3, '0', STR_PAD_LEFT),
+                    'numero_arrivage' => 'ARR-'.str_pad((string) (24000 + $n), 5, '0', STR_PAD_LEFT),
+                    'statut' => (string) (($n % 4) + 1),
+                    'created_by' => $userId,
+                    'updated_by' => $userId,
+                ]
+            );
         }
     }
 

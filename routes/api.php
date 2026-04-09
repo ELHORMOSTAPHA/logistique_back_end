@@ -32,6 +32,8 @@ Route::middleware('jwt.auth')->group(function () {
     // Route::apiResource('stock', StockController::class);
     // Route::patch('stocks/{id}/depot', [StockController::class, 'changeDepot'])->whereNumber('id');
     Route::apiResource('stock', StockController::class);
+    //import excel
+    Route::post('stock/import-stock', [StockController::class, 'importStock']);
     //depot
     Route::apiResource('depot', DepotController::class);
     //lot

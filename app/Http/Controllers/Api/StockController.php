@@ -110,4 +110,9 @@ class StockController extends Controller
             'data' => $stock,
         ]);
     }
+    // import fichier excel
+    public function importStock(Request $request): JsonResponse
+    {
+
+    }
 }

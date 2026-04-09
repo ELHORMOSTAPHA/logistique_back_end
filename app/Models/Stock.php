@@ -15,15 +15,33 @@ class Stock extends Model
         'modele',
         'version',
         'marque',
+        //numero_chassis=vin
         'vin',
+        'numero_commande',//numero_commande
+        'client',
+        'type_client',
+        'PGEO',
+        'finition',
         'color_ex',
         'color_ex_code',
         'color_int',
         'color_int_code',
+        'options',
+        'vendeur',
+        'site_affecte',
+        'date_creation_commande',
         'reserved',
         'depot_id',
-        'lot_id',
+        'stock_status_id',
+        'date_arrivage_prevu',//Date prévisionnelle de livraison
+        'date_arrivage_reelle',//Date réelle de livraison
+        'date_affectation',//Date réelle d'affectation
+        'numero_lot',//Numero de lot
+        'numero_arrivage',//Numero d'arrivage
+        'statut',//etat d'avancement de la livraison
         'created_by',
+        'deleted_by',
+        'deleted_at',
         'updated_by',
     ];
 
@@ -37,11 +55,14 @@ class Stock extends Model
     {
         return $this->belongsTo(Depot::class);
     }
-
-    public function lot(): BelongsTo
+    public function stockStatus(): BelongsTo
     {
-        return $this->belongsTo(Lot::class);
+        return $this->belongsTo(StockStatus::class);
     }
+    // public function lot(): BelongsTo
+    // {
+    //     return $this->belongsTo(Lot::class);
+    // }
     //queries builder
     /**
      * Global keyword search across stock columns and related depot / lot fields (API `name` param).

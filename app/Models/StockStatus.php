@@ -4,22 +4,24 @@ namespace App\Models;
 
 use App\Models\Concerns\RecordsDeletedBy;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class LotStatus extends Model
+class StockStatus extends Model
 {
     use RecordsDeletedBy, SoftDeletes;
 
-    protected $table = 'lot_statuses';
+    protected $table = 'stock_statuses';
 
     public $timestamps = false;
 
     protected $fillable = [
         'name',
-        'lot_statuscol',
+        'stock_status',
     ];
-    public function lots(): HasMany
+
+    public function stocks(): HasMany
     {
-        return $this->hasMany(Lot::class);
+        return $this->hasMany(Stock::class);
     }
 }
