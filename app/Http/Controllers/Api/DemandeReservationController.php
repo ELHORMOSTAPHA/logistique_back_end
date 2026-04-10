@@ -11,6 +11,8 @@ use App\Models\DemandeReservation;
 use App\Services\DemandeReservation\DemandeReservationService;
 use App\Traits\ApiResponsable;
 use Illuminate\Http\JsonResponse;
+use App\Http\Resources\DemandeReservationResource;
+
 
 class DemandeReservationController extends Controller
 {
@@ -24,7 +26,9 @@ class DemandeReservationController extends Controller
     {
         try {
             $data = $this->demandeReservationService->list($request->validated());
-
+            if ($data instanceof Collection) {
+                return $this->success(DemandeReservationResource::collection($data), MessageKey::FETCHED);
+            }
             return $this->success($data, MessageKey::FETCHED);
         } catch (\Exception $e) {
             return $this->error(MessageKey::SERVER, $e->getMessage());
@@ -35,8 +39,10 @@ class DemandeReservationController extends Controller
     {
         try {
             $row = $this->demandeReservationService->create($request->toDto());
-
-            return $this->success($row->load('stock'), MessageKey::CREATED, 201);
+            if ($row instanceof Collection) {
+                return $this->success(DemandeReservationResource::collection($row), MessageKey::CREATED, 201);
+            }
+            return $this->success($row, MessageKey::CREATED, 201);
         } catch (\Exception $e) {
             return $this->error(MessageKey::SERVER, $e->getMessage());
         }

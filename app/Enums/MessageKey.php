@@ -73,7 +73,7 @@ enum MessageKey: string
             self::AUTH_TOKEN_INVALID => 'Jeton invalide ou expiré',
             self::USER_NOT_FOUND => 'Utilisateur non trouvé',
             self::AUTH_INVALID_CREDENTIALS => 'Identifiants invalides',
-            self::ACCOUNT_INACTIVE => 'Votre compte n\'est pas actif. Veuillez contacter le support EUROFAT',
+            self::ACCOUNT_INACTIVE => 'Votre compte n\'est pas actif. Veuillez contacter le support m-automotiv',
             self::AUTH_REFRESH_FAILED => 'Jeton de rafraîchissement invalide ou expiré',
             self::AUTH_TOKEN_TYPE_MISMATCH => 'Type de jeton invalide',
         };

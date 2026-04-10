@@ -25,4 +25,12 @@ class StoreDemandeReservationRequest extends FormRequest
             'statut' => ['nullable', 'string', 'max:45'],
         ];
     }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toDto(): array
+    {
+        return $this->validated();
+    }
 }

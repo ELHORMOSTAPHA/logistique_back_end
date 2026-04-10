@@ -24,7 +24,8 @@ class DemandeReservationResource extends JsonResource
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
             'deleted_at' => $this->deleted_at,
-            'stock' => new StockResource($this->whenLoaded('stock')),
+            'stock' => $this->stock,
+            'demande_motifs' => $this->demandeMotifs,
             'demande_changement_vins' => DemandeChangementVinResource::collection($this->whenLoaded('demandeChangementVins')),
         ];
     }

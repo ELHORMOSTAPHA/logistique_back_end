@@ -24,6 +24,7 @@ class DatabaseSeeder extends Seeder
             HistoriqueSeeder::class,
             DemandeReservationSeeder::class,
             DemandeChangementVinSeeder::class,
+            DemandeMotifSeeder::class,
         ]);
     }
 }

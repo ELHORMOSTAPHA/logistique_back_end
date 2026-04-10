@@ -28,6 +28,11 @@ class DemandeReservation extends Model
         return $this->belongsTo(Stock::class);
     }
 
+    public function demandeMotifs(): HasMany
+    {
+        return $this->hasMany(DemandeMotif::class, 'demandes_reservation_id');
+    }
+
     public function demandeChangementVins(): HasMany
     {
         return $this->hasMany(DemandeChangementVin::class, 'demandes_reservation_id');

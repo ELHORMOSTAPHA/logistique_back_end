@@ -6,7 +6,7 @@ use App\Models\DemandeReservation;
 use App\Support\PaginationPayload;
 use App\Support\QueryFilterNormalizer;
 use Illuminate\Support\Collection;
-
+use App\Http\Resources\DemandeReservationResource;
 class DemandeReservationService
 {
     /**
@@ -16,7 +16,7 @@ class DemandeReservationService
     public function list(array $query): array|Collection
     {
         $f = QueryFilterNormalizer::demandeReservation($query);
-        $builder = DemandeReservation::query()->with(['stock']);
+        $builder = DemandeReservation::query()->with(['stock', 'demandeMotifs']);
 
         if ($f['stock_id'] !== null) {
             $builder->where('stock_id', $f['stock_id']);
@@ -48,10 +48,14 @@ class DemandeReservationService
         $builder->orderBy($sortBy, $order);
 
         if ($f['paginated'] === false) {
-            return $builder->get();
+            $rows = $builder->get();
+            return $rows;
         }
 
         $pagination = $builder->paginate($f['per_page'], ['*'], 'page', $f['page'] ?? 1);
+        // Ensure nested relations are attached to page items (avoids empty relations after paginate in some setups).
+        $pagination->getCollection()->loadMissing(['stock', 'demandeMotifs']);
+        $pagination->through(fn (DemandeReservation $row) => (new DemandeReservationResource($row))->resolve());
 
         return PaginationPayload::fromPaginator($pagination);
     }
@@ -77,7 +81,7 @@ class DemandeReservationService
 
     public function find(int $id): ?DemandeReservation
     {
-        return DemandeReservation::query()->with(['stock'])->find($id);
+        return DemandeReservation::query()->with(['stock', 'demandeMotifs'])->find($id);
     }
 
     /**
@@ -90,19 +94,18 @@ class DemandeReservationService
             return null;
         }
 
-        $data = array_filter([
-            'stock_id' => $validated['stock_id'] ?? null,
-            'id_demande' => $validated['id_demande'] ?? null,
-            'nom_commercial' => $validated['nom_commercial'] ?? null,
-            'id_commercial' => $validated['id_commercial'] ?? null,
-            'demande_infos' => $validated['demande_infos'] ?? null,
-            'statut' => $validated['statut'] ?? null,
-        ], static fn ($v) => $v !== null);
+        $allowed = ['stock_id', 'id_demande', 'nom_commercial', 'id_commercial', 'demande_infos', 'statut'];
+        $data = [];
+        foreach ($allowed as $key) {
+            if (array_key_exists($key, $validated)) {
+                $data[$key] = $validated[$key];
+            }
+        }
         if ($data !== []) {
             $row->update($data);
         }
 
-        return $row->fresh()->load(['stock']);
+        return $row->fresh()->load(['stock', 'demandeMotifs']);
     }
 
     public function delete(int $id): bool
