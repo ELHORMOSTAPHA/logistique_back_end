@@ -2,52 +2,60 @@
 
 namespace App\Services\Lot;
 
-use App\DTOs\Lot\CreateLotDto;
-use App\DTOs\Lot\ListLotDto;
-use App\DTOs\Lot\UpdateLotDto;
 use App\Models\Lot;
 use App\Support\PaginationPayload;
+use App\Support\QueryFilterNormalizer;
 use Illuminate\Support\Collection;
 
 class LotService
 {
     /**
+     * @param  array<string, mixed>  $query
      * @return array<string, mixed>|Collection<int, Lot>
      */
-    public function list(ListLotDto $dto): array|Collection
+    public function list(array $query): array|Collection
     {
-        $query = Lot::query();
+        $f = QueryFilterNormalizer::lot($query);
+        $builder = Lot::query();
 
-        if ($dto->numero_lot !== null) {
-            $query->where('numero_lot', 'like', '%'.addcslashes($dto->numero_lot, '%_\\').'%');
+        if ($f['numero_lot'] !== null) {
+            $builder->where('numero_lot', 'like', '%'.addcslashes($f['numero_lot'], '%_\\').'%');
         }
-        if ($dto->numero_arrivage !== null) {
-            $query->where('numero_arrivage', 'like', '%'.addcslashes($dto->numero_arrivage, '%_\\').'%');
+        if ($f['numero_arrivage'] !== null) {
+            $builder->where('numero_arrivage', 'like', '%'.addcslashes($f['numero_arrivage'], '%_\\').'%');
         }
-        if ($dto->statut !== null) {
-            $query->where('statut', 'like', '%'.addcslashes($dto->statut, '%_\\').'%');
+        if ($f['statut'] !== null) {
+            $builder->where('statut', 'like', '%'.addcslashes($f['statut'], '%_\\').'%');
         }
-        if ($dto->from !== null && $dto->to !== null) {
-            $query->whereBetween('date_arrivage_prevu', [$dto->from, $dto->to]);
+        if ($f['from'] !== null && $f['to'] !== null) {
+            $builder->whereBetween('date_arrivage_prevu', [$f['from'], $f['to']]);
         }
 
         $allowedSort = ['created_at', 'id', 'numero_lot', 'numero_arrivage', 'statut'];
-        $sortBy = in_array($dto->sort_by, $allowedSort, true) ? $dto->sort_by : 'created_at';
-        $order = in_array($dto->sort_order, ['asc', 'desc'], true) ? $dto->sort_order : 'desc';
-        $query->orderBy($sortBy, $order);
+        $sortBy = in_array($f['sort_by'], $allowedSort, true) ? $f['sort_by'] : 'created_at';
+        $order = in_array($f['sort_order'], ['asc', 'desc'], true) ? $f['sort_order'] : 'desc';
+        $builder->orderBy($sortBy, $order);
 
-        if ($dto->paginated === false) {
-            return $query->get();
+        if ($f['paginated'] === false) {
+            return $builder->get();
         }
 
-        $pagination = $query->paginate($dto->per_page, ['*'], 'page', $dto->page ?? 1);
+        $pagination = $builder->paginate($f['per_page'], ['*'], 'page', $f['page'] ?? 1);
 
         return PaginationPayload::fromPaginator($pagination);
     }
 
-    public function create(CreateLotDto $dto, ?int $userId): Lot
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function create(array $data, ?int $userId): Lot
     {
-        $attributes = $dto->toArray();
+        $attributes = array_filter([
+            'numero_lot' => isset($data['numero_lot']) && $data['numero_lot'] !== '' ? (string) $data['numero_lot'] : null,
+            'numero_arrivage' => isset($data['numero_arrivage']) && $data['numero_arrivage'] !== '' ? (string) $data['numero_arrivage'] : null,
+            'statut' => isset($data['statut']) && $data['statut'] !== '' ? (string) $data['statut'] : null,
+            'date_arrivage_prevu' => isset($data['date_arrivage_prevu']) && $data['date_arrivage_prevu'] !== '' ? (string) $data['date_arrivage_prevu'] : null,
+        ], static fn ($v) => $v !== null);
         if ($userId !== null) {
             $attributes['created_by'] = (string) $userId;
         }
@@ -60,14 +68,22 @@ class LotService
         return Lot::query()->find($id);
     }
 
-    public function update(int $id, UpdateLotDto $dto, ?int $userId): ?Lot
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    public function update(int $id, array $validated, ?int $userId): ?Lot
     {
         $lot = Lot::query()->find($id);
         if (! $lot) {
             return null;
         }
 
-        $data = $dto->toArray();
+        $data = array_filter([
+            'numero_lot' => $validated['numero_lot'] ?? null,
+            'numero_arrivage' => $validated['numero_arrivage'] ?? null,
+            'statut' => $validated['statut'] ?? null,
+            'date_arrivage_prevu' => $validated['date_arrivage_prevu'] ?? null,
+        ], static fn ($v) => $v !== null && $v !== '');
         if ($userId !== null) {
             $data['updated_by'] = $userId;
         }

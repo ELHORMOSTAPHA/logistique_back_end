@@ -16,7 +16,6 @@ class StockSeeder extends Seeder
         $depotIds = Depot::query()->orderBy('id')->pluck('id')->all();
         $stockStatusIds = StockStatus::query()->orderBy('id')->pluck('id')->all();
 
-        $marques = ['Renault', 'Peugeot', 'Dacia', 'Citroën'];
         $modeles = ['Clio', '208', 'Sandero', 'C3', 'Megane', '3008'];
         $clients = ['Auto Hall', 'Sopriam', 'M-Automotive', 'Particulier'];
         $colorsEx = ['Blanc Nacré', 'Gris Platine', 'Noir Métal', 'Bleu Iron'];
@@ -36,7 +35,6 @@ class StockSeeder extends Seeder
                 [
                     'modele' => $modeles[($n - 1) % count($modeles)],
                     'version' => 'Intens',
-                    'marque' => $marques[($n - 1) % count($marques)],
                     'numero_commande' => 'CMD-'.str_pad((string) $n, 5, '0', STR_PAD_LEFT),
                     'client' => $clients[($n - 1) % count($clients)],
                     'type_client' => $n % 4 === 0 ? 'Particulier' : 'Société',

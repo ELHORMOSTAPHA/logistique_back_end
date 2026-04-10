@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Depot;
 
-use App\DTOs\Depot\CreateDepotDto;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreDepotRequest extends FormRequest
@@ -21,10 +20,5 @@ class StoreDepotRequest extends FormRequest
             'name' => ['nullable', 'string', 'max:45'],
             'type' => ['nullable', 'string', 'max:45'],
         ];
-    }
-
-    public function toDto(): CreateDepotDto
-    {
-        return CreateDepotDto::fromArray($this->validated());
     }
 }

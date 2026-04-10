@@ -16,7 +16,6 @@ class StockResource extends JsonResource
             'id' => $this->id,
             'modele' => $this->modele,
             'version' => $this->version,
-            'marque' => $this->marque,
             'vin' => $this->vin,
             'numero_commande' => $this->numero_commande,
             'client' => $this->client,

@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Historique;
 
-use App\DTOs\Historique\ListHistoriqueDto;
 use Illuminate\Foundation\Http\FormRequest;
 
 class IndexHistoriqueRequest extends FormRequest
@@ -48,10 +47,5 @@ class IndexHistoriqueRequest extends FormRequest
             'sort_by' => ['sometimes', 'nullable', 'string', 'max:255'],
             'sort_order' => ['sometimes', 'nullable', 'string', 'max:255'],
         ];
-    }
-
-    public function toFilterDto(): ListHistoriqueDto
-    {
-        return ListHistoriqueDto::fromArray($this->validated());
     }
 }

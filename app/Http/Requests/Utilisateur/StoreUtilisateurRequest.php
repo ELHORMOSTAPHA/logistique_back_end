@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Utilisateur;
 
-use App\DTOs\Utilisateur\CreateUtilisateurDto;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreUtilisateurRequest extends FormRequest
@@ -27,10 +26,5 @@ class StoreUtilisateurRequest extends FormRequest
             'password' => ['required', 'string', 'min:8'],
             'avatar' => ['nullable', 'string', 'max:500'],
         ];
-    }
-
-    public function toDto(): CreateUtilisateurDto
-    {
-        return CreateUtilisateurDto::fromArray($this->validated());
     }
 }

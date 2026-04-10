@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Stock;
 
-use App\DTOs\Stock\CreateStockDto;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreStockRequest extends FormRequest
@@ -20,7 +19,6 @@ class StoreStockRequest extends FormRequest
         return [
             'modele' => ['required','nullable', 'string', 'max:45'],
             'version' => ['required','nullable', 'string', 'max:45'],
-            'marque' => ['required','nullable', 'string', 'max:45'],
             'vin' => ['nullable', 'string', 'max:45', 'unique:stocks,vin'],
             'color_ex' => ['nullable', 'string', 'max:45'],
             'color_ex_code' => ['nullable', 'string', 'max:45'],
@@ -30,10 +28,5 @@ class StoreStockRequest extends FormRequest
             'depot_id' => ['nullable', 'integer', 'exists:depots,id'],
             'lot_id' => ['required', 'integer', 'exists:lots,id'],
         ];
-    }
-
-    public function toDto(): CreateStockDto
-    {
-        return CreateStockDto::fromArray($this->validated());
     }
 }

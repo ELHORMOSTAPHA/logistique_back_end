@@ -14,7 +14,6 @@ class Stock extends Model
     protected $fillable = [
         'modele',
         'version',
-        'marque',
         //numero_chassis=vin
         'vin',
         'numero_commande',//numero_commande
@@ -79,7 +78,6 @@ class Stock extends Model
         return $query->where(function ($q) use ($like, $name) {
             $q->where('modele', 'like', $like)
                 ->orWhere('version', 'like', $like)
-                ->orWhere('marque', 'like', $like)
                 ->orWhere('vin', 'like', $like)
                 ->orWhere('color_ex', 'like', $like)
                 ->orWhere('color_ex_code', 'like', $like)
@@ -104,10 +102,6 @@ class Stock extends Model
     public function scopeFilterByDate($query, $from, $to)
     {
         return $query->whereBetween('created_at', [$from, $to]);
-    }
-    public function scopeFilterByMarque($query, $marque)
-    {
-        return $query->where('marque', 'like', '%'.$marque.'%');
     }
     public function scopeFilterByModele($query, $modele)
     {

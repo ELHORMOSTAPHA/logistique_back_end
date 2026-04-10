@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Historique;
 
-use App\DTOs\Historique\CreateHistoriqueDto;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreHistoriqueRequest extends FormRequest
@@ -25,10 +24,5 @@ class StoreHistoriqueRequest extends FormRequest
             'old_value' => ['nullable', 'string'],
             'new_value' => ['nullable', 'string'],
         ];
-    }
-
-    public function toDto(): CreateHistoriqueDto
-    {
-        return CreateHistoriqueDto::fromArray($this->validated());
     }
 }

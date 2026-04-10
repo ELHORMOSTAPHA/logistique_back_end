@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Profile;
 
-use App\DTOs\Profile\ListProfileDto;
 use Illuminate\Foundation\Http\FormRequest;
 
 class IndexProfileRequest extends FormRequest
@@ -46,10 +45,5 @@ class IndexProfileRequest extends FormRequest
             'sort_by' => ['sometimes', 'nullable', 'string', 'max:255'],
             'sort_order' => ['sometimes', 'nullable', 'string', 'max:255'],
         ];
-    }
-
-    public function toFilterDto(): ListProfileDto
-    {
-        return ListProfileDto::fromArray($this->validated());
     }
 }

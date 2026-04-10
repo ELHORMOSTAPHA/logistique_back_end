@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\DTOs\Profile\UpdateProfileDto;
 use App\Enums\MessageKey;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Profile\IndexProfileRequest;
@@ -24,7 +23,7 @@ class ProfileController extends Controller
     public function index(IndexProfileRequest $request): JsonResponse
     {
         try {
-            $profiles = $this->profileService->list($request->toFilterDto());
+            $profiles = $this->profileService->list($request->validated());
 
             return $this->success($profiles, MessageKey::FETCHED);
         } catch (\Exception $e) {
@@ -51,8 +50,7 @@ class ProfileController extends Controller
     public function update(UpdateProfileRequest $request, Profile $profile): JsonResponse
     {
         try {
-            $dto = UpdateProfileDto::fromRequest($request);
-            $updated = $this->profileService->update($profile->id, $dto);
+            $updated = $this->profileService->update($profile->id, $request->validated());
 
             if (! $updated) {
                 return $this->error(MessageKey::NOT_FOUND, null, 404);

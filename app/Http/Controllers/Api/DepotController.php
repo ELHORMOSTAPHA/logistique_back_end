@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\DTOs\Depot\UpdateDepotDto;
 use App\Enums\MessageKey;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Depot\IndexDepotRequest;
@@ -29,7 +28,7 @@ class DepotController extends Controller
     public function index(IndexDepotRequest $request): JsonResponse
     {
         try {
-            $depots = $this->depotService->list($request->toFilterDto());
+            $depots = $this->depotService->list($request->validated());
 
             return $this->success($depots, MessageKey::FETCHED);
         } catch (\Exception $e) {
@@ -42,7 +41,7 @@ class DepotController extends Controller
      */
     public function store(StoreDepotRequest $request): JsonResponse
     {
-        $depot = $this->depotService->create($request->toDto(), Auth::id());
+        $depot = $this->depotService->create($request->validated(), Auth::id());
 
         return $this->success($depot, MessageKey::CREATED, 201);
     }
@@ -61,8 +60,7 @@ class DepotController extends Controller
     public function update(UpdateDepotRequest $request, Depot $depot): JsonResponse
     {
         try {
-            $dto = UpdateDepotDto::fromRequest($request);
-            $updated = $this->depotService->update($depot->id, $dto);
+            $updated = $this->depotService->update($depot->id, $request->validated());
 
             if (! $updated) {
                 return $this->error(MessageKey::NOT_FOUND, null, 404);

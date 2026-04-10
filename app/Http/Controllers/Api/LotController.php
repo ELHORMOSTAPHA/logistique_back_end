@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\DTOs\Lot\UpdateLotDto;
 use App\Enums\MessageKey;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Lot\IndexLotRequest;
@@ -25,7 +24,7 @@ class LotController extends Controller
     public function index(IndexLotRequest $request): JsonResponse
     {
         try {
-            $lots = $this->lotService->list($request->toFilterDto());
+            $lots = $this->lotService->list($request->validated());
 
             return $this->success($lots, MessageKey::FETCHED);
         } catch (\Exception $e) {
@@ -36,7 +35,7 @@ class LotController extends Controller
     public function store(StoreLotRequest $request): JsonResponse
     {
         try {
-            $lot = $this->lotService->create($request->toDto(), Auth::id());
+            $lot = $this->lotService->create($request->validated(), Auth::id());
 
             return $this->success($lot, MessageKey::CREATED, 201);
         } catch (\Exception $e) {
@@ -52,8 +51,7 @@ class LotController extends Controller
     public function update(UpdateLotRequest $request, Lot $lot): JsonResponse
     {
         try {
-            $dto = UpdateLotDto::fromRequest($request);
-            $updated = $this->lotService->update($lot->id, $dto, Auth::id());
+            $updated = $this->lotService->update($lot->id, $request->validated(), Auth::id());
 
             if (! $updated) {
                 return $this->error(MessageKey::NOT_FOUND, null, 404);

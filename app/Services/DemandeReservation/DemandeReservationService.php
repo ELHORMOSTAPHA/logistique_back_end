@@ -2,63 +2,77 @@
 
 namespace App\Services\DemandeReservation;
 
-use App\DTOs\DemandeReservation\CreateDemandeReservationDto;
-use App\DTOs\DemandeReservation\ListDemandeReservationDto;
-use App\DTOs\DemandeReservation\UpdateDemandeReservationDto;
 use App\Models\DemandeReservation;
 use App\Support\PaginationPayload;
+use App\Support\QueryFilterNormalizer;
 use Illuminate\Support\Collection;
 
 class DemandeReservationService
 {
     /**
+     * @param  array<string, mixed>  $query
      * @return array<string, mixed>|Collection<int, DemandeReservation>
      */
-    public function list(ListDemandeReservationDto $dto): array|Collection
+    public function list(array $query): array|Collection
     {
-        $query = DemandeReservation::query()->with(['stock']);
+        $f = QueryFilterNormalizer::demandeReservation($query);
+        $builder = DemandeReservation::query()->with(['stock']);
 
-        if ($dto->stock_id !== null) {
-            $query->where('stock_id', $dto->stock_id);
+        if ($f['stock_id'] !== null) {
+            $builder->where('stock_id', $f['stock_id']);
         }
-        if ($dto->statut !== null) {
-            $query->where('statut', 'like', '%'.addcslashes($dto->statut, '%_\\').'%');
+        if ($f['statut'] !== null) {
+            $builder->where('statut', 'like', '%'.addcslashes($f['statut'], '%_\\').'%');
         }
-        if ($dto->id_demande !== null) {
-            $query->where('id_demande', 'like', '%'.addcslashes($dto->id_demande, '%_\\').'%');
+        if ($f['id_demande'] !== null) {
+            $builder->where('id_demande', 'like', '%'.addcslashes($f['id_demande'], '%_\\').'%');
         }
-        if ($dto->nom_commercial !== null) {
-            $query->where('nom_commercial', 'like', '%'.addcslashes($dto->nom_commercial, '%_\\').'%');
+        if ($f['nom_commercial'] !== null) {
+            $builder->where('nom_commercial', 'like', '%'.addcslashes($f['nom_commercial'], '%_\\').'%');
         }
-        if ($dto->keyword !== null) {
-            $like = '%'.addcslashes($dto->keyword, '%_\\').'%';
-            $query->where(function ($q) use ($like) {
+        if ($f['keyword'] !== null) {
+            $like = '%'.addcslashes($f['keyword'], '%_\\').'%';
+            $builder->where(function ($q) use ($like) {
                 $q->where('demande_infos', 'like', $like)
                     ->orWhere('id_demande', 'like', $like)
                     ->orWhere('nom_commercial', 'like', $like);
             });
         }
-        if ($dto->from !== null && $dto->to !== null) {
-            $query->whereBetween('created_at', [$dto->from, $dto->to]);
+        if ($f['from'] !== null && $f['to'] !== null) {
+            $builder->whereBetween('created_at', [$f['from'], $f['to']]);
         }
 
         $allowedSort = ['created_at', 'id', 'stock_id', 'statut'];
-        $sortBy = in_array($dto->sort_by, $allowedSort, true) ? $dto->sort_by : 'created_at';
-        $order = in_array($dto->sort_order, ['asc', 'desc'], true) ? $dto->sort_order : 'desc';
-        $query->orderBy($sortBy, $order);
+        $sortBy = in_array($f['sort_by'], $allowedSort, true) ? $f['sort_by'] : 'created_at';
+        $order = in_array($f['sort_order'], ['asc', 'desc'], true) ? $f['sort_order'] : 'desc';
+        $builder->orderBy($sortBy, $order);
 
-        if ($dto->paginated === false) {
-            return $query->get();
+        if ($f['paginated'] === false) {
+            return $builder->get();
         }
 
-        $pagination = $query->paginate($dto->per_page, ['*'], 'page', $dto->page ?? 1);
+        $pagination = $builder->paginate($f['per_page'], ['*'], 'page', $f['page'] ?? 1);
 
         return PaginationPayload::fromPaginator($pagination);
     }
 
-    public function create(CreateDemandeReservationDto $dto): DemandeReservation
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function create(array $data): DemandeReservation
     {
-        return DemandeReservation::query()->create($dto->toArray());
+        $row = [
+            'stock_id' => (int) $data['stock_id'],
+            'id_demande' => isset($data['id_demande']) && $data['id_demande'] !== '' ? (string) $data['id_demande'] : null,
+            'nom_commercial' => isset($data['nom_commercial']) && $data['nom_commercial'] !== '' ? (string) $data['nom_commercial'] : null,
+            'id_commercial' => isset($data['id_commercial']) && $data['id_commercial'] !== '' ? (int) $data['id_commercial'] : null,
+            'demande_infos' => isset($data['demande_infos']) && $data['demande_infos'] !== '' ? (string) $data['demande_infos'] : null,
+        ];
+        if (isset($data['statut']) && $data['statut'] !== '') {
+            $row['statut'] = (string) $data['statut'];
+        }
+
+        return DemandeReservation::query()->create(array_filter($row, static fn ($v) => $v !== null));
     }
 
     public function find(int $id): ?DemandeReservation
@@ -66,14 +80,24 @@ class DemandeReservationService
         return DemandeReservation::query()->with(['stock'])->find($id);
     }
 
-    public function update(int $id, UpdateDemandeReservationDto $dto): ?DemandeReservation
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    public function update(int $id, array $validated): ?DemandeReservation
     {
         $row = DemandeReservation::query()->find($id);
         if (! $row) {
             return null;
         }
 
-        $data = $dto->toArray();
+        $data = array_filter([
+            'stock_id' => $validated['stock_id'] ?? null,
+            'id_demande' => $validated['id_demande'] ?? null,
+            'nom_commercial' => $validated['nom_commercial'] ?? null,
+            'id_commercial' => $validated['id_commercial'] ?? null,
+            'demande_infos' => $validated['demande_infos'] ?? null,
+            'statut' => $validated['statut'] ?? null,
+        ], static fn ($v) => $v !== null);
         if ($data !== []) {
             $row->update($data);
         }

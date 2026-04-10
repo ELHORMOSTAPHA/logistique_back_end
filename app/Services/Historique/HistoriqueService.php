@@ -2,64 +2,74 @@
 
 namespace App\Services\Historique;
 
-use App\DTOs\Historique\CreateHistoriqueDto;
-use App\DTOs\Historique\ListHistoriqueDto;
-use App\DTOs\Historique\UpdateHistoriqueDto;
 use App\Models\Historique;
 use App\Support\PaginationPayload;
+use App\Support\QueryFilterNormalizer;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
 
 class HistoriqueService
 {
     /**
+     * @param  array<string, mixed>  $query
      * @return array<string, mixed>|Collection<int, Historique>
      */
-    public function list(ListHistoriqueDto $dto): array|Collection
+    public function list(array $query): array|Collection
     {
-        $query = Historique::query();
+        $f = QueryFilterNormalizer::historique($query);
+        $builder = Historique::query();
 
-        if ($dto->user_id !== null) {
-            $query->where('user_id', $dto->user_id);
+        if ($f['user_id'] !== null) {
+            $builder->where('user_id', $f['user_id']);
         }
-        if ($dto->action !== null) {
-            $query->where('action', 'like', '%'.addcslashes($dto->action, '%_\\').'%');
+        if ($f['action'] !== null) {
+            $builder->where('action', 'like', '%'.addcslashes($f['action'], '%_\\').'%');
         }
-        if ($dto->table_name !== null) {
-            $query->where('table_name', 'like', '%'.addcslashes($dto->table_name, '%_\\').'%');
+        if ($f['table_name'] !== null) {
+            $builder->where('table_name', 'like', '%'.addcslashes($f['table_name'], '%_\\').'%');
         }
-        if ($dto->record_id !== null) {
-            $query->where('record_id', $dto->record_id);
+        if ($f['record_id'] !== null) {
+            $builder->where('record_id', $f['record_id']);
         }
-        if ($dto->keyword !== null) {
-            $like = '%'.addcslashes($dto->keyword, '%_\\').'%';
-            $query->where(function ($q) use ($like) {
+        if ($f['keyword'] !== null) {
+            $like = '%'.addcslashes($f['keyword'], '%_\\').'%';
+            $builder->where(function ($q) use ($like) {
                 $q->where('old_value', 'like', $like)
                     ->orWhere('new_value', 'like', $like)
                     ->orWhere('table_name', 'like', $like);
             });
         }
-        if ($dto->from !== null && $dto->to !== null) {
-            $query->whereBetween('created_at', [$dto->from, $dto->to]);
+        if ($f['from'] !== null && $f['to'] !== null) {
+            $builder->whereBetween('created_at', [$f['from'], $f['to']]);
         }
 
         $allowedSort = ['id', 'created_at', 'action', 'table_name'];
-        $sortBy = in_array($dto->sort_by, $allowedSort, true) ? $dto->sort_by : 'id';
-        $order = in_array($dto->sort_order, ['asc', 'desc'], true) ? $dto->sort_order : 'desc';
-        $query->orderBy($sortBy, $order);
+        $sortBy = in_array($f['sort_by'], $allowedSort, true) ? $f['sort_by'] : 'id';
+        $order = in_array($f['sort_order'], ['asc', 'desc'], true) ? $f['sort_order'] : 'desc';
+        $builder->orderBy($sortBy, $order);
 
-        if ($dto->paginated === false) {
-            return $query->get();
+        if ($f['paginated'] === false) {
+            return $builder->get();
         }
 
-        $pagination = $query->paginate($dto->per_page, ['*'], 'page', $dto->page ?? 1);
+        $pagination = $builder->paginate($f['per_page'], ['*'], 'page', $f['page'] ?? 1);
 
         return PaginationPayload::fromPaginator($pagination);
     }
 
-    public function create(CreateHistoriqueDto $dto, ?int $userId): Historique
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function create(array $data, ?int $userId): Historique
     {
-        $attributes = $dto->toArray();
+        $attributes = array_filter([
+            'user_id' => isset($data['user_id']) && $data['user_id'] !== '' ? (string) $data['user_id'] : null,
+            'action' => isset($data['action']) && $data['action'] !== '' ? (string) $data['action'] : null,
+            'table_name' => isset($data['table_name']) && $data['table_name'] !== '' ? (string) $data['table_name'] : null,
+            'record_id' => isset($data['record_id']) && $data['record_id'] !== '' ? (int) $data['record_id'] : null,
+            'old_value' => isset($data['old_value']) ? (string) $data['old_value'] : null,
+            'new_value' => isset($data['new_value']) ? (string) $data['new_value'] : null,
+        ], static fn ($v) => $v !== null);
         $attributes['created_by'] = $userId;
         $attributes['created_at'] = Date::now();
 
@@ -71,14 +81,24 @@ class HistoriqueService
         return Historique::query()->find($id);
     }
 
-    public function update(int $id, UpdateHistoriqueDto $dto): ?Historique
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    public function update(int $id, array $validated): ?Historique
     {
         $row = Historique::query()->find($id);
         if (! $row) {
             return null;
         }
 
-        $data = $dto->toArray();
+        $data = array_filter([
+            'user_id' => $validated['user_id'] ?? null,
+            'action' => $validated['action'] ?? null,
+            'table_name' => $validated['table_name'] ?? null,
+            'record_id' => $validated['record_id'] ?? null,
+            'old_value' => $validated['old_value'] ?? null,
+            'new_value' => $validated['new_value'] ?? null,
+        ], static fn ($v) => $v !== null);
         if ($data !== []) {
             $row->update($data);
         }

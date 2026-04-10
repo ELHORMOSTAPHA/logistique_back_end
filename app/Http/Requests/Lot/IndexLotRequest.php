@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Lot;
 
-use App\DTOs\Lot\ListLotDto;
 use Illuminate\Foundation\Http\FormRequest;
 
 class IndexLotRequest extends FormRequest
@@ -46,10 +45,5 @@ class IndexLotRequest extends FormRequest
             'sort_by' => ['sometimes', 'nullable', 'string', 'max:255'],
             'sort_order' => ['sometimes', 'nullable', 'string', 'max:255'],
         ];
-    }
-
-    public function toFilterDto(): ListLotDto
-    {
-        return ListLotDto::fromArray($this->validated());
     }
 }

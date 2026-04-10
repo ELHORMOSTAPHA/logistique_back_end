@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Lot;
 
-use App\DTOs\Lot\CreateLotDto;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreLotRequest extends FormRequest
@@ -23,10 +22,5 @@ class StoreLotRequest extends FormRequest
             'statut' => ['nullable', 'string', 'max:45'],
             'date_arrivage_prevu' => ['nullable', 'date'],
         ];
-    }
-
-    public function toDto(): CreateLotDto
-    {
-        return CreateLotDto::fromArray($this->validated());
     }
 }

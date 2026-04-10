@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\DTOs\Historique\UpdateHistoriqueDto;
 use App\Enums\MessageKey;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Historique\IndexHistoriqueRequest;
@@ -25,7 +24,7 @@ class HistoriqueController extends Controller
     public function index(IndexHistoriqueRequest $request): JsonResponse
     {
         try {
-            $data = $this->historiqueService->list($request->toFilterDto());
+            $data = $this->historiqueService->list($request->validated());
 
             return $this->success($data, MessageKey::FETCHED);
         } catch (\Exception $e) {
@@ -36,7 +35,7 @@ class HistoriqueController extends Controller
     public function store(StoreHistoriqueRequest $request): JsonResponse
     {
         try {
-            $row = $this->historiqueService->create($request->toDto(), Auth::id());
+            $row = $this->historiqueService->create($request->validated(), Auth::id());
 
             return $this->success($row, MessageKey::CREATED, 201);
         } catch (\Exception $e) {
@@ -52,8 +51,7 @@ class HistoriqueController extends Controller
     public function update(UpdateHistoriqueRequest $request, Historique $historique): JsonResponse
     {
         try {
-            $dto = UpdateHistoriqueDto::fromRequest($request);
-            $updated = $this->historiqueService->update($historique->id, $dto);
+            $updated = $this->historiqueService->update($historique->id, $request->validated());
 
             if (! $updated) {
                 return $this->error(MessageKey::NOT_FOUND, null, 404);

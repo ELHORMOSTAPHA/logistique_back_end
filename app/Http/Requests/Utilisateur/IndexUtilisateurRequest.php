@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Utilisateur;
 
-use App\DTOs\Utilisateur\ListUtilisateurDto;
 use Illuminate\Foundation\Http\FormRequest;
 
 class IndexUtilisateurRequest extends FormRequest
@@ -46,10 +45,5 @@ class IndexUtilisateurRequest extends FormRequest
             'sort_by' => ['sometimes', 'nullable', 'string', 'max:255'],
             'sort_order' => ['sometimes', 'nullable', 'string', 'max:255'],
         ];
-    }
-
-    public function toFilterDto(): ListUtilisateurDto
-    {
-        return ListUtilisateurDto::fromArray($this->validated());
     }
 }

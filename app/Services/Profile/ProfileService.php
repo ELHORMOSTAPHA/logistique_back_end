@@ -2,52 +2,64 @@
 
 namespace App\Services\Profile;
 
-use App\DTOs\Profile\CreateProfileDto;
-use App\DTOs\Profile\ListProfileDto;
-use App\DTOs\Profile\UpdateProfileDto;
 use App\Models\Profile;
 use App\Support\PaginationPayload;
+use App\Support\QueryFilterNormalizer;
 use Illuminate\Support\Collection;
 
 class ProfileService
 {
     /**
+     * @param  array<string, mixed>  $query
      * @return array<string, mixed>|Collection<int, Profile>
      */
-    public function list(ListProfileDto $dto): array|Collection
+    public function list(array $query): array|Collection
     {
-        $query = Profile::query();
+        $f = QueryFilterNormalizer::profile($query);
+        $builder = Profile::query();
 
-        if ($dto->nom !== null) {
-            $query->where('nom', 'like', '%'.addcslashes($dto->nom, '%_\\').'%');
+        if ($f['nom'] !== null) {
+            $builder->where('nom', 'like', '%'.addcslashes($f['nom'], '%_\\').'%');
         }
-        if ($dto->libelle !== null) {
-            $query->where('libelle', 'like', '%'.addcslashes($dto->libelle, '%_\\').'%');
+        if ($f['libelle'] !== null) {
+            $builder->where('libelle', 'like', '%'.addcslashes($f['libelle'], '%_\\').'%');
         }
-        if ($dto->statut !== null) {
-            $query->where('statut', 'like', '%'.addcslashes($dto->statut, '%_\\').'%');
+        if ($f['statut'] !== null) {
+            $builder->where('statut', 'like', '%'.addcslashes($f['statut'], '%_\\').'%');
         }
-        if ($dto->from !== null && $dto->to !== null) {
-            $query->whereBetween('created_at', [$dto->from, $dto->to]);
+        if ($f['from'] !== null && $f['to'] !== null) {
+            $builder->whereBetween('created_at', [$f['from'], $f['to']]);
         }
 
         $allowedSort = ['created_at', 'id', 'nom', 'libelle', 'statut'];
-        $sortBy = in_array($dto->sort_by, $allowedSort, true) ? $dto->sort_by : 'created_at';
-        $order = in_array($dto->sort_order, ['asc', 'desc'], true) ? $dto->sort_order : 'desc';
-        $query->orderBy($sortBy, $order);
+        $sortBy = in_array($f['sort_by'], $allowedSort, true) ? $f['sort_by'] : 'created_at';
+        $order = in_array($f['sort_order'], ['asc', 'desc'], true) ? $f['sort_order'] : 'desc';
+        $builder->orderBy($sortBy, $order);
 
-        if ($dto->paginated === false) {
-            return $query->get();
+        if ($f['paginated'] === false) {
+            return $builder->get();
         }
 
-        $pagination = $query->paginate($dto->per_page, ['*'], 'page', $dto->page ?? 1);
+        $pagination = $builder->paginate($f['per_page'], ['*'], 'page', $f['page'] ?? 1);
 
         return PaginationPayload::fromPaginator($pagination);
     }
 
-    public function create(CreateProfileDto $dto): Profile
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function create(array $data): Profile
     {
-        return Profile::query()->create($dto->toArray());
+        $attributes = array_filter([
+            'nom' => (string) $data['nom'],
+            'libelle' => isset($data['libelle']) && $data['libelle'] !== '' ? (string) $data['libelle'] : null,
+            'statut' => isset($data['statut']) && $data['statut'] !== '' ? (string) $data['statut'] : null,
+        ], static fn ($v) => $v !== null);
+        if (! isset($attributes['statut'])) {
+            $attributes['statut'] = 'actif';
+        }
+
+        return Profile::query()->create($attributes);
     }
 
     public function find(int $id): ?Profile
@@ -55,14 +67,21 @@ class ProfileService
         return Profile::query()->find($id);
     }
 
-    public function update(int $id, UpdateProfileDto $dto): ?Profile
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    public function update(int $id, array $validated): ?Profile
     {
         $profile = Profile::query()->find($id);
         if (! $profile) {
             return null;
         }
 
-        $data = $dto->toArray();
+        $data = array_filter([
+            'nom' => $validated['nom'] ?? null,
+            'libelle' => $validated['libelle'] ?? null,
+            'statut' => $validated['statut'] ?? null,
+        ], static fn ($v) => $v !== null && $v !== '');
         if ($data !== []) {
             $profile->update($data);
         }

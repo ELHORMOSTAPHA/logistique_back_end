@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\DemandeReservation;
 
-use App\DTOs\DemandeReservation\ListDemandeReservationDto;
 use Illuminate\Foundation\Http\FormRequest;
 
 class IndexDemandeReservationRequest extends FormRequest
@@ -48,10 +47,5 @@ class IndexDemandeReservationRequest extends FormRequest
             'sort_by' => ['sometimes', 'nullable', 'string', 'max:255'],
             'sort_order' => ['sometimes', 'nullable', 'string', 'max:255'],
         ];
-    }
-
-    public function toFilterDto(): ListDemandeReservationDto
-    {
-        return ListDemandeReservationDto::fromArray($this->validated());
     }
 }

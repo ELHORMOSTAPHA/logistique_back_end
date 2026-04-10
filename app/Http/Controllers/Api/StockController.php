@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Stock\ChangeDepotStockRequest;
+use App\Http\Requests\Stock\ImportStockRequest;
 use App\Http\Requests\Stock\IndexStockRequest;
 use App\Http\Requests\Stock\StoreStockRequest;
 use App\Http\Requests\Stock\UpdateStockRequest;
@@ -12,7 +13,6 @@ use App\Services\Stock\StockService;
 use App\Traits\ApiResponsable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
-use App\DTOs\Stock\UpdateStockDto;
 
 class StockController extends Controller
 {
@@ -29,7 +29,7 @@ class StockController extends Controller
     public function index(IndexStockRequest $request): JsonResponse
     {
         try {
-        $stocks = $this->stockService->list($request->toFilterDto());
+        $stocks = $this->stockService->list($request->validated());
             return $this->success($stocks, MessageKey::FETCHED);
         } catch (\Exception $e) {
             return $this->error(MessageKey::SERVER, $e->getMessage());
@@ -43,7 +43,7 @@ class StockController extends Controller
     public function store(StoreStockRequest $request): JsonResponse
     {
         try {
-            $stock = $this->stockService->create($request->toDto(), Auth::id());
+            $stock = $this->stockService->create($request->validated(), Auth::id());
             return $this->success($stock, MessageKey::CREATED);
         } catch (\Exception $e) {
             return $this->error(MessageKey::SERVER, $e->getMessage());
@@ -72,8 +72,7 @@ class StockController extends Controller
     public function update(UpdateStockRequest $request, int $id): JsonResponse
     {
         try {
-            $dto=UpdateStockDto::fromRequest($request);
-            $stock = $this->stockService->update($id, $dto, Auth::id());
+            $stock = $this->stockService->update($id, $request->validated(), Auth::id());
             return $this->success($stock, MessageKey::UPDATED);
         } catch (\Exception $e) {
             return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
@@ -99,7 +98,7 @@ class StockController extends Controller
      */
     public function changeDepot(ChangeDepotStockRequest $request, int $id): JsonResponse
     {
-        $stock = $this->stockService->changeDepot($id, $request->toDto(), Auth::id());
+        $stock = $this->stockService->changeDepot($id, $request->validated(), Auth::id());
 
         if (! $stock) {
             return response()->json(['message' => 'Véhicule introuvable.'], 404);
@@ -110,9 +109,17 @@ class StockController extends Controller
             'data' => $stock,
         ]);
     }
-    // import fichier excel
-    public function importStock(Request $request): JsonResponse
+    // import JSON rows from file drop
+    public function importStock(ImportStockRequest $request): JsonResponse
     {
-
+        try {
+            $result = $this->stockService->importRows(
+                $request->validated('rows', []),
+                Auth::id()
+            );
+            return $this->success($result, MessageKey::CREATED);
+        } catch (\Exception $e) {
+            return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
+        }
     }
 }

@@ -32,8 +32,9 @@ Route::middleware('jwt.auth')->group(function () {
     // Route::apiResource('stock', StockController::class);
     // Route::patch('stocks/{id}/depot', [StockController::class, 'changeDepot'])->whereNumber('id');
     Route::apiResource('stock', StockController::class);
-    //import excel
+    // Import JSON rows (client parses .xlsx / .csv / .ods)
     Route::post('stock/import-stock', [StockController::class, 'importStock']);
+    Route::post('stock/import', [StockController::class, 'importStock']);
     //depot
     Route::apiResource('depot', DepotController::class);
     //lot

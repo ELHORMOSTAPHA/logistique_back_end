@@ -3,7 +3,7 @@
 namespace App\Http\Requests\Stock;
 
 use Illuminate\Foundation\Http\FormRequest;
-use App\DTOs\Stock\ListStockDto;
+
 class IndexStockRequest extends FormRequest
 {
     public function authorize(): bool
@@ -38,7 +38,6 @@ class IndexStockRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'marque' => ['sometimes', 'nullable', 'string', 'max:255'],
             'modele' => ['sometimes', 'nullable', 'string', 'max:255'],
             'vin' => ['sometimes', 'nullable', 'string', 'max:45'],
             'reserved' => ['sometimes', 'nullable'],
@@ -53,10 +52,5 @@ class IndexStockRequest extends FormRequest
             'per_page' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:100'],
             'page' => ['sometimes', 'nullable', 'integer', 'min:1'],
         ];
-    }
-
-    public function toFilterDto(): ListStockDto
-    {
-        return ListStockDto::fromArray($this->validated());
     }
 }

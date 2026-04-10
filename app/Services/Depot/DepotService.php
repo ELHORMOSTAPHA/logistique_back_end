@@ -2,64 +2,70 @@
 
 namespace App\Services\Depot;
 
-use App\DTOs\Depot\CreateDepotDto;
-use App\DTOs\Depot\ListDepotDto;
-use App\DTOs\Depot\UpdateDepotDto;
 use App\Models\Depot;
 use App\Support\PaginationPayload;
+use App\Support\QueryFilterNormalizer;
 use Illuminate\Support\Collection;
 
 class DepotService
 {
     /**
+     * @param  array<string, mixed>  $query
      * @return array<string, mixed>|Collection<int, Depot>
      */
-    public function list(ListDepotDto $dto): array|Collection
+    public function list(array $query): array|Collection
     {
-        $query = Depot::query();
+        $f = QueryFilterNormalizer::depot($query);
+        $builder = Depot::query();
 
-        if ($dto->name !== null) {
-            $query->filterByName($dto->name);
+        if ($f['name'] !== null) {
+            $builder->filterByName($f['name']);
         }
-        if ($dto->type !== null) {
-            $query->filterByType($dto->type);
+        if ($f['type'] !== null) {
+            $builder->filterByType($f['type']);
         }
-        if ($dto->from !== null && $dto->to !== null) {
-            $query->filterByDate($dto->from, $dto->to);
+        if ($f['from'] !== null && $f['to'] !== null) {
+            $builder->filterByDate($f['from'], $f['to']);
         }
-        if ($dto->created_at !== null) {
-            $query->whereDate('created_at', $dto->created_at);
+        if ($f['created_at'] !== null) {
+            $builder->whereDate('created_at', $f['created_at']);
         }
-        if ($dto->updated_at !== null) {
-            $query->whereDate('updated_at', $dto->updated_at);
+        if ($f['updated_at'] !== null) {
+            $builder->whereDate('updated_at', $f['updated_at']);
         }
-        if ($dto->created_by !== null) {
-            $query->where('created_by', (string) $dto->created_by);
+        if ($f['created_by'] !== null) {
+            $builder->where('created_by', (string) $f['created_by']);
         }
-        if ($dto->deleted_by !== null) {
-            $query->where('deleted_by', $dto->deleted_by);
+        if ($f['deleted_by'] !== null) {
+            $builder->where('deleted_by', $f['deleted_by']);
         }
-        if ($dto->deleted_at !== null) {
-            $query->onlyTrashed()->whereDate('deleted_at', $dto->deleted_at);
+        if ($f['deleted_at'] !== null) {
+            $builder->onlyTrashed()->whereDate('deleted_at', $f['deleted_at']);
         }
 
         $allowedSort = ['created_at', 'name', 'type', 'id'];
-        $sortBy = in_array($dto->sort_by, $allowedSort, true) ? $dto->sort_by : 'created_at';
-        $order = in_array($dto->sort_order, ['asc', 'desc'], true) ? $dto->sort_order : 'desc';
-        $query->orderBy($sortBy, $order);
+        $sortBy = in_array($f['sort_by'], $allowedSort, true) ? $f['sort_by'] : 'created_at';
+        $order = in_array($f['sort_order'], ['asc', 'desc'], true) ? $f['sort_order'] : 'desc';
+        $builder->orderBy($sortBy, $order);
 
-        if ($dto->paginated === false) {
-            return $query->get();
+        if ($f['paginated'] === false) {
+            return $builder->get();
         }
 
-        $pagination = $query->paginate($dto->per_page, ['*'], 'page', $dto->page ?? 1);
+        $pagination = $builder->paginate($f['per_page'], ['*'], 'page', $f['page'] ?? 1);
 
         return PaginationPayload::fromPaginator($pagination);
     }
 
-    public function create(CreateDepotDto $dto, ?int $userId): Depot
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function create(array $data, ?int $userId): Depot
     {
-        $attributes = $dto->toArray();
+        $attributes = array_filter([
+            'name' => $data['name'] ?? null,
+            'type' => $data['type'] ?? null,
+        ], static fn ($v) => $v !== null);
         if ($userId !== null) {
             $attributes['created_by'] = (string) $userId;
         }
@@ -72,7 +78,10 @@ class DepotService
         return Depot::query()->find($id);
     }
 
-    public function update(int $id, UpdateDepotDto $dto): ?Depot
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    public function update(int $id, array $validated): ?Depot
     {
         $depot = Depot::query()->find($id);
 
@@ -80,7 +89,10 @@ class DepotService
             return null;
         }
 
-        $data = $dto->toArray();
+        $data = array_filter([
+            'name' => $validated['name'] ?? null,
+            'type' => $validated['type'] ?? null,
+        ], static fn ($v) => $v !== null);
 
         if ($data !== []) {
             $depot->update($data);

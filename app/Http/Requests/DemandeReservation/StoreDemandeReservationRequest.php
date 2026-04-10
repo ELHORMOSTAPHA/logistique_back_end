@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\DemandeReservation;
 
-use App\DTOs\DemandeReservation\CreateDemandeReservationDto;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreDemandeReservationRequest extends FormRequest
@@ -25,10 +24,5 @@ class StoreDemandeReservationRequest extends FormRequest
             'demande_infos' => ['nullable', 'string', 'max:45'],
             'statut' => ['nullable', 'string', 'max:45'],
         ];
-    }
-
-    public function toDto(): CreateDemandeReservationDto
-    {
-        return CreateDemandeReservationDto::fromArray($this->validated());
     }
 }

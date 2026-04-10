@@ -10,9 +10,8 @@ return new class extends Migration
     {
         Schema::create('stocks', function (Blueprint $table) {
             $table->id();
-            $table->string('modele', 45)->nullable();
             $table->string('version', 45)->nullable();
-            $table->string('marque', 45)->nullable();
+            $table->string('modele', 45)->nullable();
             $table->string('vin', 45)->nullable()->unique();
             $table->string('numero_commande', 45)->nullable();
             $table->string('client', 120)->nullable();

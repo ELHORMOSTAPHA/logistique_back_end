@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\DTOs\Utilisateur\UpdateUtilisateurDto;
 use App\Enums\MessageKey;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Utilisateur\IndexUtilisateurRequest;
@@ -24,7 +23,7 @@ class UtilisateurController extends Controller
     public function index(IndexUtilisateurRequest $request): JsonResponse
     {
         try {
-            $data = $this->utilisateurService->list($request->toFilterDto());
+            $data = $this->utilisateurService->list($request->validated());
 
             return $this->success($data, MessageKey::FETCHED);
         } catch (\Exception $e) {
@@ -53,8 +52,7 @@ class UtilisateurController extends Controller
     public function update(UpdateUtilisateurRequest $request, User $utilisateur): JsonResponse
     {
         try {
-            $dto = UpdateUtilisateurDto::fromRequest($request);
-            $updated = $this->utilisateurService->update($utilisateur->id, $dto);
+            $updated = $this->utilisateurService->update($utilisateur->id, $request->validated());
 
             if (! $updated) {
                 return $this->error(MessageKey::NOT_FOUND, null, 404);

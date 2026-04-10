@@ -2,66 +2,67 @@
 
 namespace App\Services\Stock;
 
-use App\DTOs\Stock\ChangeDepotDto;
-use App\DTOs\Stock\CreateStockDto;
-use App\DTOs\Stock\ListStockDto;
-use App\DTOs\Stock\UpdateStockDto;
 use App\Models\Stock;
 use App\Support\PaginationPayload;
+use App\Support\QueryFilterNormalizer;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class StockService
 {
     /**
+     * @param  array<string, mixed>  $query  Validated index / query parameters
      * @return array<string, mixed>|Collection<int, Stock>
      */
-    public function list(ListStockDto $dto): array|Collection
+    public function list(array $query): array|Collection
     {
-        $query = Stock::query()->with(['depot','stockStatus']);
+        $f = QueryFilterNormalizer::stock($query);
+        $queryBuilder = Stock::query()->with(['depot', 'stockStatus']);
 
-        if ($dto->name !== null) {
-            $query->filterByName($dto->name);
+        if ($f['name'] !== null) {
+            $queryBuilder->filterByName($f['name']);
         }
-        if ($dto->from !== null && $dto->to !== null) {
-            $query->filterByDate($dto->from, $dto->to);
+        if ($f['from'] !== null && $f['to'] !== null) {
+            $queryBuilder->filterByDate($f['from'], $f['to']);
         }
-        if ($dto->marque !== null) {
-            $query->filterByMarque($dto->marque);
+        if ($f['modele'] !== null) {
+            $queryBuilder->filterByModele($f['modele']);
         }
-        if ($dto->modele !== null) {
-            $query->filterByModele($dto->modele);
+        if ($f['vin'] !== null) {
+            $queryBuilder->where('vin', $f['vin']);
         }
-        if ($dto->vin !== null) {
-            $query->where('vin', $dto->vin);
+        if ($f['reserved'] !== null) {
+            $queryBuilder->filterByReserved($f['reserved']);
         }
-        if ($dto->reserved !== null) {
-            $query->filterByReserved($dto->reserved);
+        if ($f['depot_id'] !== null) {
+            $queryBuilder->filterByDepotId($f['depot_id']);
         }
-        if ($dto->depot_id !== null) {
-            $query->filterByDepotId($dto->depot_id);
+        if ($f['lot_id'] !== null) {
+            $queryBuilder->filterByLotId($f['lot_id']);
         }
-        if ($dto->lot_id !== null) {
-            $query->filterByLotId($dto->lot_id);
-        }
+        $allowedSort = ['created_at', 'modele', 'vin', 'id'];
+        $sortBy = in_array($f['sort_by'], $allowedSort, true) ? $f['sort_by'] : 'created_at';
+        $order = in_array($f['sort_order'], ['asc', 'desc'], true) ? $f['sort_order'] : 'desc';
+        $queryBuilder->orderBy($sortBy, $order);
 
-        $allowedSort = ['created_at', 'modele', 'marque', 'vin', 'id'];
-        $sortBy = in_array($dto->sort_by, $allowedSort, true) ? $dto->sort_by : 'created_at';
-        $order = in_array($dto->sort_order, ['asc', 'desc'], true) ? $dto->sort_order : 'desc';
-        $query->orderBy($sortBy, $order);
-
-        if ($dto->paginated === false) {
-            return $query->get();
+        if ($f['paginated'] === false) {
+            return $queryBuilder->get();
         }
 
-        $pagination = $query->paginate($dto->per_page, ['*'], 'page', $dto->page ?? 1);
+        $pagination = $queryBuilder->paginate($f['per_page'], ['*'], 'page', $f['page'] ?? 1);
 
         return PaginationPayload::fromPaginator($pagination);
     }
 
-    public function create(CreateStockDto $dto, ?int $userId): Stock
+    /**
+     * @param  array<string, mixed>  $data  Validated store payload
+     */
+    public function create(array $data, ?int $userId): Stock
     {
         try {
-            $attributes = $dto->toArray();
+            $attributes = $this->stockCreateAttributes($data);
             $attributes['created_by'] = $userId;
             $stock = Stock::query()->create($attributes);
             $stock->load(['depot', 'lot']);
@@ -79,14 +80,17 @@ class StockService
         }
     }
 
-    public function update(int $id, UpdateStockDto $dto, ?int $userId): ?Stock
+    /**
+     * @param  array<string, mixed>  $validated  Validated update payload (present keys only)
+     */
+    public function update(int $id, array $validated, ?int $userId): ?Stock
     {
         try {
             $stock = Stock::findOrFail($id);
-            if (! $stock) {
-                $this->error(MessageKey::NOT_FOUND, 'Stock not found');
+            $payload = $this->stockUpdateAttributes($validated);
+            if ($payload !== []) {
+                $stock->update($payload);
             }
-            $stock->update($dto->toArray());
             return $stock;
         } catch (\Exception $e) {
             throw new \Exception($e->getMessage());
@@ -104,7 +108,10 @@ class StockService
         return (bool) $stock->delete();
     }
 
-    public function changeDepot(int $id, ChangeDepotDto $dto, ?int $userId): ?Stock
+    /**
+     * @param  array<string, mixed>  $data  Validated payload with depot_id
+     */
+    public function changeDepot(int $id, array $data, ?int $userId): ?Stock
     {
         $stock = Stock::query()->find($id);
 
@@ -113,15 +120,197 @@ class StockService
         }
 
         $stock->update([
-            'depot_id' => $dto->depot_id,
+            'depot_id' => (int) $data['depot_id'],
             'updated_by' => $userId,
         ]);
         $stock->load(['depot', 'lot']);
 
         return $stock;
     }
-    public function importStock(ImportStockRequest $request)
+    
+    /**
+     * Import stock rows from a validated JSON batch. Each row runs in its own
+     * transaction so one failure does not roll back siblings in the batch.
+     *
+     * Rules:
+     * - VIN vide / absent : création d’une nouvelle ligne avec les données reçues.
+     * - VIN renseigné : recherche d’une ligne existante avec `vin` NULL et les mêmes
+     *   (modele, finition, color_ex, color_int) ; si trouvée, mise à jour (dont le VIN) ;
+     *   sinon la ligne est ignorée et un message est ajouté.
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     * @return array{total: int, created: int, updated: int, skipped: int, messages: array<int, string>, created_details: array<int, string>, updated_details: array<int, string>}
+     */
+    public function importRows(array $rows, ?int $userId): array
     {
+        $total = count($rows);
+        $created = 0;
+        $updated = 0;
+        $skipped = 0;
+        $messages = [];
+        $createdDetails = [];
+        $updatedDetails = [];
 
+        foreach ($rows as $index => $row) {
+            $lineNo = $index + 1;
+            $vinRaw = isset($row['vin']) ? trim((string) $row['vin']) : '';
+            $lineLabel = 'Ligne '.$lineNo.($vinRaw !== '' ? ' (VIN: '.$vinRaw.')' : '');
+
+            if ($vinRaw === '') {
+                try {
+                    DB::transaction(function () use ($row, $userId, &$created) {
+                        $attrs = $this->stockAttributesFromImportRow($row);
+                        Stock::query()->create(array_merge($attrs, [
+                            'created_by' => $userId,
+                            'updated_by' => $userId,
+                        ]));
+                        $created++;
+                    });
+                    $createdDetails[] = $lineLabel.' — Nouvelle ligne créée (sans N° châssis dans le fichier).';
+                } catch (\Throwable $e) {
+                    $skipped++;
+                    $messages[] = $lineLabel.' — '.$e->getMessage();
+                }
+
+                continue;
+            }
+
+            $placeholder = $this->findStockWithoutVinMatchingIdentity($row);
+
+            if ($placeholder === null) {
+                $skipped++;
+                $messages[] = $lineLabel.' — Aucune ligne sans VIN ne correspond (modèle, finition, couleurs).';
+
+                continue;
+            }
+
+            try {
+                DB::transaction(function () use ($row, $userId, $placeholder, &$updated) {
+                    $attrs = $this->stockAttributesFromImportRow($row);
+                    $placeholder->update(array_merge($attrs, [
+                        'updated_by' => $userId,
+                    ]));
+                    $updated++;
+                });
+                $updatedDetails[] = $lineLabel.' — Correspondance sans VIN #'.$placeholder->getKey()
+                    .' : mise à jour avec ce N° châssis.';
+            } catch (\Throwable $e) {
+                $skipped++;
+                $messages[] = $lineLabel.' — '.$e->getMessage();
+            }
+        }
+
+        return [
+            'total' => $total,
+            'created' => $created,
+            'updated' => $updated,
+            'skipped' => $skipped,
+            'messages' => $messages,
+            'created_details' => $createdDetails,
+            'updated_details' => $updatedDetails,
+        ];
+    }
+
+    /**
+     * Ligne `stocks` avec vin NULL dont (modele, finition, color_ex, color_int)
+     * correspondent à l’import (chaînes vides / null traitées comme « vides »).
+     */
+    private function findStockWithoutVinMatchingIdentity(array $row): ?Stock
+    {
+        $query = Stock::query()->whereNull('vin');
+
+        foreach (['modele', 'finition', 'color_ex', 'color_int'] as $field) {
+            $raw = $row[$field] ?? null;
+            if ($raw === null || (is_string($raw) && trim($raw) === '')) {
+                $query->where(function ($q) use ($field) {
+                    $q->whereNull($field)->orWhere($field, '');
+                });
+            } else {
+                $query->where($field, is_string($raw) ? trim($raw) : (string) $raw);
+            }
+        }
+
+        return $query->first();
+    }
+
+    /**
+     * Map import keys to DB columns; omit empties. Dates normalized to Y-m-d.
+     * `date_desaffectation` is ignored until a DB column exists.
+     *
+     * @param  array<string, mixed>  $row
+     * @return array<string, mixed>
+     */
+    private function stockAttributesFromImportRow(array $row): array
+    {
+        $mapping = [
+            'vin' => 'vin',
+            'numero_commande' => 'numero_commande',
+            'statut' => 'statut',
+            'date_arrivage_prevu' => 'date_arrivage_prevu',
+            'client' => 'client',
+            'type_client' => 'type_client',
+            'PGEO' => 'PGEO',
+            'modele' => 'modele',
+            'finition' => 'finition',
+            'options' => 'options',
+            'color_ex' => 'color_ex',
+            'color_int' => 'color_int',
+            'vendeur' => 'vendeur',
+            'site_affecte' => 'site_affecte',
+            'date_creation_commande' => 'date_creation_commande',
+            'date_affectation' => 'date_affectation',
+            'date_arrivage_reelle' => 'date_arrivage_reelle',
+            'version' => 'version',
+        ];
+
+        $dateColumns = [
+            'date_arrivage_prevu',
+            'date_arrivage_reelle',
+            'date_affectation',
+            'date_creation_commande',
+        ];
+
+        $out = [];
+
+        foreach ($mapping as $importKey => $column) {
+            if (! array_key_exists($importKey, $row)) {
+                continue;
+            }
+            $val = $row[$importKey];
+            if ($val === null || $val === '') {
+                continue;
+            }
+
+            if (in_array($column, $dateColumns, true)) {
+                $normalized = $this->normalizeImportDateValue($val);
+                if ($normalized !== null) {
+                    $out[$column] = $normalized;
+                }
+
+                continue;
+            }
+
+            $out[$column] = is_string($val) ? $val : (string) $val;
+        }
+
+        return $out;
+    }
+
+    private function normalizeImportDateValue(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if ($value instanceof \DateTimeInterface) {
+            return Carbon::parse($value)->format('Y-m-d');
+        }
+
+        $str = is_string($value) ? trim($value) : (string) $value;
+
+        try {
+            return Carbon::parse($str)->format('Y-m-d');
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }

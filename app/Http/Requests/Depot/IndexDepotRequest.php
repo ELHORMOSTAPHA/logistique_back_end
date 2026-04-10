@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Depot;
 
-use App\DTOs\Depot\ListDepotDto;
 use Illuminate\Foundation\Http\FormRequest;
 
 class IndexDepotRequest extends FormRequest
@@ -54,10 +53,5 @@ class IndexDepotRequest extends FormRequest
             'sort_by' => ['sometimes', 'nullable', 'string', 'max:255'],
             'sort_order' => ['sometimes', 'nullable', 'string', 'max:255'],
         ];
-    }
-
-    public function toFilterDto(): ListDepotDto
-    {
-        return ListDepotDto::fromArray($this->validated());
     }
 }

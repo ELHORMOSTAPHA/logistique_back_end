@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\DTOs\DemandeReservation\UpdateDemandeReservationDto;
 use App\Enums\MessageKey;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\DemandeReservation\IndexDemandeReservationRequest;
@@ -24,7 +23,7 @@ class DemandeReservationController extends Controller
     public function index(IndexDemandeReservationRequest $request): JsonResponse
     {
         try {
-            $data = $this->demandeReservationService->list($request->toFilterDto());
+            $data = $this->demandeReservationService->list($request->validated());
 
             return $this->success($data, MessageKey::FETCHED);
         } catch (\Exception $e) {
@@ -53,8 +52,7 @@ class DemandeReservationController extends Controller
     public function update(UpdateDemandeReservationRequest $request, DemandeReservation $demande_reservation): JsonResponse
     {
         try {
-            $dto = UpdateDemandeReservationDto::fromRequest($request);
-            $updated = $this->demandeReservationService->update($demande_reservation->id, $dto);
+            $updated = $this->demandeReservationService->update($demande_reservation->id, $request->validated());
 
             if (! $updated) {
                 return $this->error(MessageKey::NOT_FOUND, null, 404);
