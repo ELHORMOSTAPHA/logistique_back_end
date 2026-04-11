@@ -6,7 +6,7 @@ Route::get('/', function () {
 
     //welcome api response
     return json_encode([
-        'message' => 'Welcome to MoLogistic API',
+        'message' => 'Welcome to MoLogistic APIiiii',
         'version' => '1.0.0',
         'status' => 'success',
         'data' => [
