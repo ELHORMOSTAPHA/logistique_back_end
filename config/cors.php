@@ -19,9 +19,8 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => [
-        'https://logistique.nextretail.ma',
-    ],
+    'allowed_origins' => ['*'],
+    
 
     'allowed_origins_patterns' => [],
 

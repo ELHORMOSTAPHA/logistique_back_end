@@ -99,6 +99,18 @@ return [
 
     'key' => env('APP_KEY'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | JWT signing secret (HS256)
+    |--------------------------------------------------------------------------
+    |
+    | Used by App\Helpers\JWTHelper. Must be a non-empty string. Define JWT_SECRET
+    | in .env. This entry is required so the value is available when config is cached.
+    |
+    */
+
+    'jwt_secret' => env('JWT_SECRET'),
+
     'previous_keys' => [
         ...array_filter(
             explode(',', (string) env('APP_PREVIOUS_KEYS', ''))

@@ -8,9 +8,14 @@ use Exception;
 
 class JWTHelper
 {
-    private static function getSecretKey()
+    private static function getSecretKey(): string
     {
-        return config('app.jwt_secret', env('JWT_SECRET'));
+        $secret = config('app.jwt_secret');
+        if (!\is_string($secret) || $secret === '') {
+            throw new \RuntimeException('JWT_SECRET is not set. Add JWT_SECRET to .env and run php artisan config:clear if you use config caching.');
+        }
+
+        return $secret;
     }
 
     public static function generateToken($userId, $ttl = 60)
