@@ -91,12 +91,6 @@ class Stock extends Model
             $q->orWhereHas('depot', function ($dq) use ($like) {
                 $dq->where('name', 'like', $like);
             });
-
-            $q->orWhereHas('lot', function ($lq) use ($like) {
-                $lq->where('numero_lot', 'like', $like)
-                    ->orWhere('numero_arrivage', 'like', $like)
-                    ->orWhere('statut', 'like', $like);
-            });
         });
     }
     public function scopeFilterByDate($query, $from, $to)

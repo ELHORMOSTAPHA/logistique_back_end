@@ -20,6 +20,7 @@ class UserResource extends JsonResource
             'telephone' => $this->telephone,
             'statut' => $this->statut,
             'avatar' => $this->avatar ? asset('storage/' . $this->avatar) : null,
+            'profile_id' => $this->id_profile,
             'profile' => new ProfileResource($this->whenLoaded('profile')), 
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

@@ -23,4 +23,12 @@ class StoreProfileRequest extends FormRequest
             'statut' => ['nullable', 'string', 'max:255'],
         ];
     }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toDto(): array
+    {
+        return $this->validated();
+    }
 }

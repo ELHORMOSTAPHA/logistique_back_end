@@ -27,4 +27,12 @@ class StoreUtilisateurRequest extends FormRequest
             'avatar' => ['nullable', 'string', 'max:500'],
         ];
     }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toDto(): array
+    {
+        return $this->validated();
+    }
 }

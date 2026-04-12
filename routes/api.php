@@ -27,7 +27,6 @@ Route::middleware('jwt.auth')->group(function () {
     // Auth
     Route::get('/auth/user', [AuthController::class, 'userDetails']);
     Route::get('/auth/me',   [AuthController::class, 'me']);
-
     // Stocks — CRUD: GET/POST /api/stocks, GET/PUT/PATCH/DELETE /api/stocks/{stock}
     // Route::apiResource('stock', StockController::class);
     // Route::patch('stocks/{id}/depot', [StockController::class, 'changeDepot'])->whereNumber('id');
@@ -37,15 +36,15 @@ Route::middleware('jwt.auth')->group(function () {
     Route::post('stock/import', [StockController::class, 'importStock']);
     //depot
     Route::apiResource('depot', DepotController::class);
-    //lot
-    Route::apiResource('lot', LotController::class);
     //historique
     Route::apiResource('historique', HistoriqueController::class);
     //demande_reservation
     Route::apiResource('demande_reservation', DemandeReservationController::class);
-    //utilisateur
+    //utilisateur — routes dédiées avant apiResource (sinon "bulk-update-status" est pris pour un id)
+    Route::post('utilisateur/bulk-update-status', [UtilisateurController::class, 'bulkUpdateStatus']);
     Route::apiResource('utilisateur', UtilisateurController::class);
     //profiles
+    Route::post('profile/bulk-update-status', [ProfileController::class, 'bulkUpdateStatus']);
     Route::apiResource('profile', ProfileController::class);
   
 });

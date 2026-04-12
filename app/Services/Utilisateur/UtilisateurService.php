@@ -24,8 +24,25 @@ class UtilisateurService
             $builder->where(function ($q) use ($kw) {
                 $q->where('nom', 'like', $kw)
                     ->orWhere('prenom', 'like', $kw)
-                    ->orWhere('email', 'like', $kw);
+                    ->orWhere('email', 'like', $kw)
+                    ->orWhere('telephone', 'like', $kw)
+                    ->orWhereHas('profile', function ($pq) use ($kw) {
+                        $pq->where('nom', 'like', $kw)
+                            ->orWhere('libelle', 'like', $kw);
+                    });
             });
+        }
+        if ($f['nom'] !== null) {
+            $n = '%'.addcslashes($f['nom'], '%_\\').'%';
+            $builder->where('nom', 'like', $n);
+        }
+        if ($f['prenom'] !== null) {
+            $p = '%'.addcslashes($f['prenom'], '%_\\').'%';
+            $builder->where('prenom', 'like', $p);
+        }
+        if ($f['email'] !== null) {
+            $e = '%'.addcslashes($f['email'], '%_\\').'%';
+            $builder->where('email', 'like', $e);
         }
         if ($f['statut'] !== null) {
             $builder->where('statut', $f['statut']);
@@ -113,5 +130,68 @@ class UtilisateurService
         }
 
         return (bool) $user->delete();
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function bulkUpdateStatut(array $data): int
+    {
+        $statut = (string) ($data['statut'] ?? '');
+        if (! in_array($statut, ['actif', 'inactif', 'suspendu'], true)) {
+            throw new \InvalidArgumentException('Invalid statut');
+        }
+
+        if (! empty($data['select_all'])) {
+            $f = QueryFilterNormalizer::utilisateur($data['filters'] ?? []);
+            $builder = User::query();
+
+            if ($f['keyword'] !== null) {
+                $kw = '%'.addcslashes($f['keyword'], '%_\\').'%';
+                $builder->where(function ($q) use ($kw) {
+                    $q->where('nom', 'like', $kw)
+                        ->orWhere('prenom', 'like', $kw)
+                        ->orWhere('email', 'like', $kw)
+                        ->orWhere('telephone', 'like', $kw)
+                        ->orWhereHas('profile', function ($pq) use ($kw) {
+                            $pq->where('nom', 'like', $kw)
+                                ->orWhere('libelle', 'like', $kw);
+                        });
+                });
+            }
+            if ($f['nom'] !== null) {
+                $n = '%'.addcslashes($f['nom'], '%_\\').'%';
+                $builder->where('nom', 'like', $n);
+            }
+            if ($f['prenom'] !== null) {
+                $p = '%'.addcslashes($f['prenom'], '%_\\').'%';
+                $builder->where('prenom', 'like', $p);
+            }
+            if ($f['email'] !== null) {
+                $e = '%'.addcslashes($f['email'], '%_\\').'%';
+                $builder->where('email', 'like', $e);
+            }
+            if ($f['statut'] !== null) {
+                $builder->where('statut', $f['statut']);
+            }
+            if ($f['id_profile'] !== null) {
+                $builder->where('id_profile', $f['id_profile']);
+            }
+            if ($f['from'] !== null && $f['to'] !== null) {
+                $builder->whereBetween('created_at', [$f['from'], $f['to']]);
+            }
+            if (! empty($data['excluded_ids'])) {
+                $builder->whereNotIn('id', array_map('intval', $data['excluded_ids']));
+            }
+
+            return $builder->update(['statut' => $statut]);
+        }
+
+        $ids = array_map('intval', $data['ids'] ?? []);
+        if ($ids === []) {
+            return 0;
+        }
+
+        return User::query()->whereIn('id', $ids)->update(['statut' => $statut]);
     }
 }

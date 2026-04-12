@@ -192,6 +192,9 @@ final class QueryFilterNormalizer
 
         return [
             'keyword' => isset($query['keyword']) && $query['keyword'] !== '' ? (string) $query['keyword'] : null,
+            'nom' => isset($query['nom']) && $query['nom'] !== '' ? (string) $query['nom'] : null,
+            'prenom' => isset($query['prenom']) && $query['prenom'] !== '' ? (string) $query['prenom'] : null,
+            'email' => isset($query['email']) && $query['email'] !== '' ? (string) $query['email'] : null,
             'statut' => isset($query['statut']) && $query['statut'] !== '' ? (string) $query['statut'] : null,
             'id_profile' => isset($query['id_profile']) && $query['id_profile'] !== '' ? (int) $query['id_profile'] : null,
             'from' => isset($query['from']) && $query['from'] !== '' ? (string) $query['from'] : null,

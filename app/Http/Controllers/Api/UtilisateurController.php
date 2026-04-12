@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\MessageKey;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Utilisateur\BulkUpdateUtilisateurStatusRequest;
 use App\Http\Requests\Utilisateur\IndexUtilisateurRequest;
 use App\Http\Requests\Utilisateur\StoreUtilisateurRequest;
 use App\Http\Requests\Utilisateur\UpdateUtilisateurRequest;
@@ -71,5 +72,18 @@ class UtilisateurController extends Controller
         }
 
         return $this->success(null, MessageKey::DELETED);
+    }
+
+    public function bulkUpdateStatus(BulkUpdateUtilisateurStatusRequest $request): JsonResponse
+    {
+        try {
+            $updated = $this->utilisateurService->bulkUpdateStatut($request->validated());
+
+            return $this->success(['updated' => $updated], MessageKey::UPDATED);
+        } catch (\InvalidArgumentException $e) {
+            return $this->error(MessageKey::INVALID, $e->getMessage(), 422);
+        } catch (\Exception $e) {
+            return $this->error(MessageKey::SERVER, $e->getMessage());
+        }
     }
 }

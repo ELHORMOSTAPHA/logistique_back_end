@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\MessageKey;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Profile\BulkUpdateProfileStatusRequest;
 use App\Http\Requests\Profile\IndexProfileRequest;
 use App\Http\Requests\Profile\StoreProfileRequest;
 use App\Http\Requests\Profile\UpdateProfileRequest;
@@ -69,5 +70,18 @@ class ProfileController extends Controller
         }
 
         return $this->success(null, MessageKey::DELETED);
+    }
+
+    public function bulkUpdateStatus(BulkUpdateProfileStatusRequest $request): JsonResponse
+    {
+        try {
+            $updated = $this->profileService->bulkUpdateStatut($request->validated());
+
+            return $this->success(['updated' => $updated], MessageKey::UPDATED);
+        } catch (\InvalidArgumentException $e) {
+            return $this->error(MessageKey::INVALID, $e->getMessage(), 422);
+        } catch (\Exception $e) {
+            return $this->error(MessageKey::SERVER, $e->getMessage());
+        }
     }
 }

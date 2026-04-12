@@ -35,6 +35,9 @@ class IndexUtilisateurRequest extends FormRequest
     {
         return [
             'keyword' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'nom' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'prenom' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'email' => ['sometimes', 'nullable', 'string', 'max:255'],
             'statut' => ['sometimes', 'nullable', 'string', 'max:255'],
             'id_profile' => ['sometimes', 'nullable', 'integer', 'exists:profiles,id'],
             'from' => ['sometimes', 'nullable', 'date'],

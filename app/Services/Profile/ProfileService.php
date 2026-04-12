@@ -98,4 +98,44 @@ class ProfileService
 
         return (bool) $profile->delete();
     }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function bulkUpdateStatut(array $data): int
+    {
+        $statut = (string) ($data['statut'] ?? '');
+        if (! in_array($statut, ['actif', 'inactif'], true)) {
+            throw new \InvalidArgumentException('Invalid statut');
+        }
+
+        if (! empty($data['select_all'])) {
+            $f = QueryFilterNormalizer::profile($data['filters'] ?? []);
+            $builder = Profile::query();
+            if ($f['nom'] !== null) {
+                $builder->where('nom', 'like', '%'.addcslashes($f['nom'], '%_\\').'%');
+            }
+            if ($f['libelle'] !== null) {
+                $builder->where('libelle', 'like', '%'.addcslashes($f['libelle'], '%_\\').'%');
+            }
+            if ($f['statut'] !== null) {
+                $builder->where('statut', 'like', '%'.addcslashes($f['statut'], '%_\\').'%');
+            }
+            if ($f['from'] !== null && $f['to'] !== null) {
+                $builder->whereBetween('created_at', [$f['from'], $f['to']]);
+            }
+            if (! empty($data['excluded_ids'])) {
+                $builder->whereNotIn('id', array_map('intval', $data['excluded_ids']));
+            }
+
+            return $builder->update(['statut' => $statut]);
+        }
+
+        $ids = array_map('intval', $data['ids'] ?? []);
+        if ($ids === []) {
+            return 0;
+        }
+
+        return Profile::query()->whereIn('id', $ids)->update(['statut' => $statut]);
+    }
 }

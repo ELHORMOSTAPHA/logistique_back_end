@@ -12,6 +12,13 @@ class UpdateUtilisateurRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('password') && $this->input('password') === '') {
+            $this->merge(['password' => null]);
+        }
+    }
+
     /**
      * @return array<string, mixed>
      */
