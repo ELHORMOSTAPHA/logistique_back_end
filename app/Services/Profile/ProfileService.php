@@ -2,10 +2,13 @@
 
 namespace App\Services\Profile;
 
+use App\Models\Module;
+use App\Models\Permission;
 use App\Models\Profile;
 use App\Support\PaginationPayload;
 use App\Support\QueryFilterNormalizer;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class ProfileService
 {
@@ -137,5 +140,68 @@ class ProfileService
         }
 
         return Profile::query()->whereIn('id', $ids)->update(['statut' => $statut]);
+    }
+
+    /**
+     * All modules with current permission flags for a profile (missing rows default to false).
+     *
+     * @return array{profile: Profile, rows: array<int, array<string, mixed>>}
+     */
+    public function permissionMatrix(int $profileId): array
+    {
+        $profile = Profile::query()->findOrFail($profileId);
+        $modules = Module::query()->orderBy('position')->orderBy('id')->get();
+        $byModule = Permission::query()
+            ->where('profile_id', $profileId)
+            ->get()
+            ->keyBy('module_id');
+
+        $rows = $modules->map(function (Module $m) use ($byModule) {
+            $p = $byModule->get($m->id);
+
+            return [
+                'module_id' => $m->id,
+                'name' => $m->name,
+                'label' => $m->label,
+                'url' => $m->url,
+                'position' => $m->position,
+                'can_read' => $p ? (bool) $p->can_read : false,
+                'can_create' => $p ? (bool) $p->can_create : false,
+                'can_update' => $p ? (bool) $p->can_update : false,
+                'can_delete' => $p ? (bool) $p->can_delete : false,
+            ];
+        })->values()->all();
+
+        return ['profile' => $profile, 'rows' => $rows];
+    }
+
+    /**
+     * @param  array<int, array{module_id: int, can_read?: bool, can_create?: bool, can_update?: bool, can_delete?: bool}>  $permissionRows
+     */
+    public function syncPermissions(int $profileId, array $permissionRows): void
+    {
+        Profile::query()->findOrFail($profileId);
+
+        DB::transaction(function () use ($profileId, $permissionRows) {
+            foreach ($permissionRows as $row) {
+                $moduleId = (int) ($row['module_id'] ?? 0);
+                if ($moduleId < 1) {
+                    continue;
+                }
+
+                Permission::query()->updateOrCreate(
+                    [
+                        'profile_id' => $profileId,
+                        'module_id' => $moduleId,
+                    ],
+                    [
+                        'can_read' => (bool) ($row['can_read'] ?? false),
+                        'can_create' => (bool) ($row['can_create'] ?? false),
+                        'can_update' => (bool) ($row['can_update'] ?? false),
+                        'can_delete' => (bool) ($row['can_delete'] ?? false),
+                    ]
+                );
+            }
+        });
     }
 }

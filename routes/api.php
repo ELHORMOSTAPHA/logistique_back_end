@@ -43,8 +43,10 @@ Route::middleware('jwt.auth')->group(function () {
     //utilisateur — routes dédiées avant apiResource (sinon "bulk-update-status" est pris pour un id)
     Route::post('utilisateur/bulk-update-status', [UtilisateurController::class, 'bulkUpdateStatus']);
     Route::apiResource('utilisateur', UtilisateurController::class);
-    //profiles
+    //profiles — specific routes before apiResource
     Route::post('profile/bulk-update-status', [ProfileController::class, 'bulkUpdateStatus']);
+    Route::get('profile/{profile}/permissions', [ProfileController::class, 'permissions']);
+    Route::put('profile/{profile}/permissions', [ProfileController::class, 'updatePermissions']);
     Route::apiResource('profile', ProfileController::class);
   
 });

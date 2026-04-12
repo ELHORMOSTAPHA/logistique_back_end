@@ -71,7 +71,7 @@ class AuthController extends Controller
             return $this->error(MessageKey::ACCOUNT_INACTIVE, null, 403);
         }
 
-        $user->load(['profile']);
+        $user->load(['profile', 'permissions.module']);
 
         $accessToken = JWTHelper::generateAccessToken($user->id);
         $refreshToken = JWTHelper::generateRefreshToken($user->id);
@@ -101,7 +101,22 @@ class AuthController extends Controller
 
     public function userDetails(Request $request)
     {
-        $user = User::with(['profile'])->find($request->user->id);
+        $user = User::with(['profile', 'permissions.module'])->find($request->user->id);
+
+        $moduleAccess = $user->permissions
+            ->filter(fn ($p) => $p->module)
+            ->sortBy(fn ($p) => $p->module->position)
+            ->values()
+            ->map(fn ($p) => [
+                'module_id' => $p->module_id,
+                'key' => $p->module->name,
+                'label' => $p->module->label,
+                'url' => $p->module->url,
+                'can_read' => $p->can_read,
+                'can_create' => $p->can_create,
+                'can_update' => $p->can_update,
+                'can_delete' => $p->can_delete,
+            ]);
 
         $userData = [
             'id' => $user->id,
@@ -113,6 +128,7 @@ class AuthController extends Controller
             'prenom' => $user->prenom,
             'nom' => $user->nom,
             'telephone' => $user->telephone,
+            'module_access' => $moduleAccess,
         ];
 
         return $this->successFlat(

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -21,7 +22,12 @@ class Profile extends Model
     public function users()
     {
         return $this->hasMany(User::class, 'id_profile');
-    }   
+    }
+
+    public function permissions(): HasMany
+    {
+        return $this->hasMany(Permission::class, 'profile_id');
+    }
 
     /**
      * The attributes that should be hidden for serialization.

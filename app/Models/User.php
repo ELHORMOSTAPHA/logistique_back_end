@@ -5,6 +5,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Models\Concerns\RecordsDeletedBy;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -36,6 +37,14 @@ class User extends Authenticatable
     public function profile(): BelongsTo
     {
         return $this->belongsTo(Profile::class, 'id_profile');
+    }
+
+    /**
+     * Rights for the user's profile (same profile_id on permissions as user's id_profile).
+     */
+    public function permissions(): HasMany
+    {
+        return $this->hasMany(Permission::class, 'profile_id', 'id_profile');
     }
 
  

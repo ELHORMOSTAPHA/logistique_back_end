@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Profile\BulkUpdateProfileStatusRequest;
 use App\Http\Requests\Profile\IndexProfileRequest;
 use App\Http\Requests\Profile\StoreProfileRequest;
+use App\Http\Requests\Profile\UpdateProfilePermissionsRequest;
 use App\Http\Requests\Profile\UpdateProfileRequest;
 use App\Models\Profile;
 use App\Services\Profile\ProfileService;
@@ -80,6 +81,32 @@ class ProfileController extends Controller
             return $this->success(['updated' => $updated], MessageKey::UPDATED);
         } catch (\InvalidArgumentException $e) {
             return $this->error(MessageKey::INVALID, $e->getMessage(), 422);
+        } catch (\Exception $e) {
+            return $this->error(MessageKey::SERVER, $e->getMessage());
+        }
+    }
+
+    public function permissions(Profile $profile): JsonResponse
+    {
+        try {
+            $matrix = $this->profileService->permissionMatrix((int) $profile->id);
+
+            return $this->success($matrix, MessageKey::FETCHED);
+        } catch (\Exception $e) {
+            return $this->error(MessageKey::SERVER, $e->getMessage());
+        }
+    }
+
+    public function updatePermissions(UpdateProfilePermissionsRequest $request, Profile $profile): JsonResponse
+    {
+        try {
+            $validated = $request->validated();
+            $this->profileService->syncPermissions((int) $profile->id, $validated['permissions']);
+
+            return $this->success(
+                $this->profileService->permissionMatrix((int) $profile->id),
+                MessageKey::UPDATED
+            );
         } catch (\Exception $e) {
             return $this->error(MessageKey::SERVER, $e->getMessage());
         }
