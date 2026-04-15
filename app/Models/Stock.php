@@ -79,6 +79,7 @@ class Stock extends Model
             $q->where('modele', 'like', $like)
                 ->orWhere('version', 'like', $like)
                 ->orWhere('vin', 'like', $like)
+                ->orWhere('numero_commande', 'like', $like)
                 ->orWhere('color_ex', 'like', $like)
                 ->orWhere('color_ex_code', 'like', $like)
                 ->orWhere('color_int', 'like', $like)

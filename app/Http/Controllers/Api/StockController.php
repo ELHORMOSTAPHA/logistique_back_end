@@ -115,7 +115,8 @@ class StockController extends Controller
         try {
             $result = $this->stockService->importRows(
                 $request->validated('rows', []),
-                Auth::id()
+                Auth::id(),
+                (string) $request->validated('import_mode', 'stock_feed')
             );
             return $this->success($result, MessageKey::CREATED);
         } catch (\Exception $e) {

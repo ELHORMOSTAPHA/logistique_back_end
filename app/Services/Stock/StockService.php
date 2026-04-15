@@ -141,7 +141,7 @@ class StockService
      * @param  array<int, array<string, mixed>>  $rows
      * @return array{total: int, created: int, updated: int, skipped: int, messages: array<int, string>, created_details: array<int, string>, updated_details: array<int, string>}
      */
-    public function importRows(array $rows, ?int $userId): array
+    public function importRows(array $rows, ?int $userId, string $importMode = 'stock_feed'): array
     {
         $total = count($rows);
         $created = 0;
@@ -155,6 +155,28 @@ class StockService
             $lineNo = $index + 1;
             $vinRaw = isset($row['vin']) ? trim((string) $row['vin']) : '';
             $lineLabel = 'Ligne '.$lineNo.($vinRaw !== '' ? ' (VIN: '.$vinRaw.')' : '');
+
+            if ($importMode === 'stock_feed') {
+                $missing = [];
+                foreach ([
+                    'numero_commande' => 'N° cde',
+                    'modele' => 'Modèle',
+                    'finition' => 'Finition',
+                    'color_ex' => 'Couleur Extérieure',
+                    'color_int' => 'Couleur Intérieure',
+                ] as $field => $label) {
+                    $val = $row[$field] ?? null;
+                    if ($val === null || (is_string($val) && trim($val) === '')) {
+                        $missing[] = $label;
+                    }
+                }
+
+                if ($missing !== []) {
+                    $skipped++;
+                    $messages[] = $lineLabel.' — champ(s) obligatoire(s) manquant(s): '.implode(', ', $missing).'.';
+                    continue;
+                }
+            }
 
             if ($vinRaw === '') {
                 try {

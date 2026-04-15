@@ -16,6 +16,7 @@ class ImportStockRequest extends FormRequest
         $date = ['nullable', 'date'];
 
         return [
+            'import_mode' => ['nullable', 'string', 'in:stock_feed,vin_update'],
             'rows' => ['required', 'array', 'min:1'],
             'rows.*' => ['required', 'array'],
             'rows.*.vin' => ['nullable', 'string', 'max:45'],
