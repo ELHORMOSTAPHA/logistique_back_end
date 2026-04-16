@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Stock\ChangeDepotStockRequest;
 use App\Http\Requests\Stock\ImportStockRequest;
+use App\Http\Requests\Stock\listStockAproximit;
 use App\Http\Requests\Stock\IndexStockRequest;
 use App\Http\Requests\Stock\StoreStockRequest;
 use App\Http\Requests\Stock\UpdateStockRequest;
@@ -119,6 +120,20 @@ class StockController extends Controller
                 (string) $request->validated('import_mode', 'stock_feed')
             );
             return $this->success($result, MessageKey::CREATED);
+        } catch (\Exception $e) {
+            return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Integration endpoint: list stock approximately matching vehicle identity.
+     * GET /api/integration/stock?modele=...&version=...&color_ex=...&color_int=...
+     */
+    public function listStockAproximit(listStockAproximit $request): JsonResponse
+    {
+        try {
+            $result = $this->stockService->listStockAproximit($request->validated());
+            return $this->success($result, MessageKey::FETCHED);
         } catch (\Exception $e) {
             return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
         }

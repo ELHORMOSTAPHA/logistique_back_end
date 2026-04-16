@@ -12,6 +12,7 @@ class Stock extends Model
     use RecordsDeletedBy, SoftDeletes;
 
     protected $fillable = [
+        
         'modele',
         'version',
         //numero_chassis=vin

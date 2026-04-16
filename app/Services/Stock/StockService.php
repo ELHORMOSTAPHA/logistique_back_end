@@ -7,6 +7,7 @@ use App\Support\PaginationPayload;
 use App\Support\QueryFilterNormalizer;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -54,6 +55,110 @@ class StockService
         $pagination = $queryBuilder->paginate($f['per_page'], ['*'], 'page', $f['page'] ?? 1);
 
         return PaginationPayload::fromPaginator($pagination);
+    }
+
+    /**
+     * Integration endpoint logic (system-to-system "approx" stock listing).
+     *
+     * Ordering:
+     * 1) Exact identity match (modele, finition, version, color_ex, color_int) with VIN and not reserved.
+     * 2) Arrival placeholder lines (VIN is NULL/empty) that do NOT match (modele, version, color_ex, color_int), not reserved.
+     * 3) Same (modele, finition) with VIN and not reserved; color matches on color_ex OR color_int.
+     *
+     * Note: partner request might not send `finition`, so we fallback `finition = version`.
+     *
+     * @param  array<string, mixed>  $query
+     * @return Collection<int, Stock>|array<string, mixed>
+     */
+    public function listStockAproximit(array $query): Collection|array
+    {
+        //trim and clean and lowercase all the query parameters
+        $modele = strtolower(trim((string) $query['modele']));
+        $version = strtolower(trim((string) $query['version']));
+        $colorEx = strtolower(trim((string) $query['color_ex']) );
+        $colorInt = strtolower(trim((string) $query['color_int']));
+        $finition = strtolower(trim((string) $query['finition']));
+
+        $group1 = Stock::query()
+            ->where('modele', $modele)
+            ->where('finition', $finition)
+            ->where('version', $version)
+            ->where('color_ex', $colorEx)
+            ->where('color_int', $colorInt)
+            ->whereNotNull('vin')
+            ->where('vin', '!=', '')
+            ->where('reserved', false)
+            ->orderBy('created_at', 'asc')
+            ->get()
+            ->map(function (Stock $s) {
+                $s->setAttribute('in_arrivage', false);
+                return $s;
+            });
+
+        $group2 = Stock::query()
+            ->where(function ($q) {
+                $q->whereNull('vin')->orWhere('vin', '');
+            })
+            ->where('modele', $modele)
+            ->where('finition', $finition)
+            ->where('version', $version)
+            ->where('color_ex', $colorEx)
+            ->where('color_int', $colorInt)
+            ->where('reserved', false)
+            ->orderBy('created_at', 'asc')
+            ->get()
+            ->map(function (Stock $s) {
+                $s->setAttribute('in_arrivage', true);
+                return $s;
+            });
+
+        $group1Ids = $group1->pluck('id')->all();
+
+        $group3 = Stock::query()
+            ->whereNotNull('vin')
+            ->where('vin', '!=', '')
+            ->where('reserved', false)
+            ->where('modele', $modele)
+            ->where('finition', $finition)
+            ->where(function ($q) use ($colorEx, $colorInt) {
+                $q->where('color_ex', $colorEx)->orWhere('color_int', $colorInt);
+            })
+            ->orderBy('created_at', 'asc')
+            ->get()
+            ->reject(fn (Stock $s) => in_array($s->id, $group1Ids, true))
+            ->values()
+            ->map(function (Stock $s) {
+                $s->setAttribute('in_arrivage', false);
+                return $s;
+            });
+
+        $all = $group1->concat($group2)->concat($group3)->unique('id')->values();
+
+        $paginated = (bool) ($query['paginated'] ?? false);
+        if (! $paginated) {
+            return $all;
+        }
+
+        $perPage = (int) ($query['per_page'] ?? 15);
+        $perPage = max(1, min(100, $perPage));
+        $page = (int) ($query['page'] ?? 1);
+        $page = max(1, $page);
+
+        $total = $all->count();
+        $items = $all->slice(($page - 1) * $perPage, $perPage)->values()->all();
+
+        $paginator = new LengthAwarePaginator(
+            $items,
+            $total,
+            $perPage,
+            $page,
+            [
+                'path' => request()->url(),
+                'query' => request()->query(),
+            ]
+        );
+
+        return PaginationPayload::fromPaginator($paginator);
     }
 
     /**
