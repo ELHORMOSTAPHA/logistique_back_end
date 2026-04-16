@@ -53,4 +53,24 @@ class JWTHelper
     {
         return self::generateToken($userId, 20160); // 14 days
     }
+
+    public static function generateIntegrationToken(
+        int $clientDbId,
+        string $clientId,
+        int $ttlSeconds = 3600
+    ): string {
+        $issuedAt = time();
+        $expire = $issuedAt + max(300, $ttlSeconds);
+
+        $payload = [
+            'iss' => config('app.url'),
+            'iat' => $issuedAt,
+            'exp' => $expire,
+            'sub' => $clientDbId,
+            'client_id' => $clientId,
+            'type' => 'integration',
+        ];
+
+        return JWT::encode($payload, self::getSecretKey(), 'HS256');
+    }
 }
