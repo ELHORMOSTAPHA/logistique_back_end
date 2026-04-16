@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ExternalSyncController;
 use App\Http\Controllers\Api\DemandeReservationController;
 use App\Http\Controllers\Api\DepotController;
 use App\Http\Controllers\Api\HistoriqueController;
@@ -17,6 +18,11 @@ use Illuminate\Support\Facades\Route;
 | API Routes - MoLogistic
 |--------------------------------------------------------------------------
 */
+
+// Route externe — SOUEAST-CRM (protégée par clé API)
+Route::middleware('api.key')->prefix('external')->group(function () {
+    Route::post('/sync-commande', [ExternalSyncController::class, 'syncCommande']);
+});
 
 // Routes publiques (sans authentification)
 Route::prefix('auth')->group(function () {
@@ -51,7 +57,7 @@ Route::middleware('jwt.auth')->group(function () {
     Route::get('profile/{profile}/permissions', [ProfileController::class, 'permissions']);
     Route::put('profile/{profile}/permissions', [ProfileController::class, 'updatePermissions']);
     Route::apiResource('profile', ProfileController::class);
-  
+
 });
 //to get brearer token lance this commande first #  php artisan integration:client:create "crm_exeedd" --scopes=integration.test --ttl=3600
 //then make request to this url http://localhost:8000/api/integration/token with the following headers:
@@ -75,7 +81,7 @@ Route::prefix('integration')->middleware('integration.auth')->group(function () 
                     'client_id' => optional($request->attributes->get('integration_client'))->client_id,
                 ],
                 'client_ip' => $request->ip(),
-                'timestamp' => now()->toISOString(),
+                'timestamp' => \Carbon\Carbon::now()->toISOString(),
             ],
         ]);
     });

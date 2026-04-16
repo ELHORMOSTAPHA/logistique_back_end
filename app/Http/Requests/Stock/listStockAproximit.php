@@ -37,11 +37,11 @@ class listStockAproximit extends FormRequest
     public function rules(): array
     {
         return [
-            'modele' => ['required', 'string', 'max:45'],
-            'marque' => ['required', 'string', 'max:45'],
-            'version' => ['required', 'string', 'max:45'],
+            'modele'   => ['required', 'string', 'max:45'],
+            'marque'   => ['sometimes', 'nullable', 'string', 'max:45'],
+            'version'  => ['sometimes', 'nullable', 'string', 'max:45'],
             'color_ex' => ['required', 'string', 'max:45'],
-            'color_int' => ['required', 'string', 'max:45'],
+            'color_int'=> ['required', 'string', 'max:45'],
             'paginated' => ['sometimes', 'boolean'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
             'page' => ['sometimes', 'integer', 'min:1'],

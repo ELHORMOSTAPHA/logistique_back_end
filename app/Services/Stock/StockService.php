@@ -93,6 +93,7 @@ class StockService
             ->get()
             ->map(function (Stock $s) {
                 $s->setAttribute('in_arrivage', false);
+                $s->setAttribute('match_type', 'exact');
                 return $s;
             });
 
@@ -110,6 +111,7 @@ class StockService
             ->get()
             ->map(function (Stock $s) {
                 $s->setAttribute('in_arrivage', true);
+                $s->setAttribute('match_type', 'arrival');
                 return $s;
             });
 
@@ -131,6 +133,7 @@ class StockService
             ->values()
             ->map(function (Stock $s) {
                 $s->setAttribute('in_arrivage', false);
+                $s->setAttribute('match_type', 'partial');
                 return $s;
             });
 
