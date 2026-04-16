@@ -1,10 +1,10 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ExternalSyncController;
 use App\Http\Controllers\Api\DemandeReservationController;
 use App\Http\Controllers\Api\DepotController;
 use App\Http\Controllers\Api\HistoriqueController;
-use App\Http\Controllers\Api\LotController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\StockController;
 use App\Http\Controllers\Api\UtilisateurController;
@@ -15,6 +15,11 @@ use Illuminate\Support\Facades\Route;
 | API Routes - MoLogistic
 |--------------------------------------------------------------------------
 */
+
+// Route externe — SOUEAST-CRM (protégée par clé API)
+Route::middleware('api.key')->prefix('external')->group(function () {
+    Route::post('/sync-commande', [ExternalSyncController::class, 'syncCommande']);
+});
 
 // Routes publiques (sans authentification)
 Route::prefix('auth')->group(function () {
