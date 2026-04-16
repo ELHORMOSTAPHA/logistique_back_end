@@ -73,18 +73,19 @@ class StockService
     public function listStockAproximit(array $query): Collection|array
     {
         //trim and clean and lowercase all the query parameters
-        $modele = strtolower(trim((string) $query['modele']));
-        $version = strtolower(trim((string) $query['version']));
-        $colorEx = strtolower(trim((string) $query['color_ex']) );
-        $colorInt = strtolower(trim((string) $query['color_int']));
-        $finition = strtolower(trim((string) $query['finition']));
+        $marque= (string) $query['marque'];
+        $modele = (string) $query['modele'];
+        $finition = (string) $query['version'];
+        $colorEx = (string) $query['color_ex'];
+        $colorInt = (string) $query['color_int'];
+        $finition = (string) $query['version'];
 
         $group1 = Stock::query()
-            ->where('modele', $modele)
-            ->where('finition', $finition)
-            ->where('version', $version)
-            ->where('color_ex', $colorEx)
-            ->where('color_int', $colorInt)
+            ->where('modele','like', '%'.$modele.'%')
+            ->where('marque','like', '%'.$marque.'%')
+            ->where('finition','like', '%'.$finition.'%')
+            ->where('color_ex','like', '%'.$colorEx.'%')
+            ->where('color_int','like', '%'.$colorInt.'%')
             ->whereNotNull('vin')
             ->where('vin', '!=', '')
             ->where('reserved', false)
@@ -99,11 +100,11 @@ class StockService
             ->where(function ($q) {
                 $q->whereNull('vin')->orWhere('vin', '');
             })
-            ->where('modele', $modele)
-            ->where('finition', $finition)
-            ->where('version', $version)
-            ->where('color_ex', $colorEx)
-            ->where('color_int', $colorInt)
+            ->where('modele','like', '%'.$modele.'%')
+            ->where('marque','like', '%'.$marque.'%')
+            ->where('finition','like', '%'.$finition.'%')
+            ->where('color_ex','like', '%'.$colorEx.'%')
+            ->where('color_int','like', '%'.$colorInt.'%')
             ->where('reserved', false)
             ->orderBy('created_at', 'asc')
             ->get()
@@ -118,10 +119,11 @@ class StockService
             ->whereNotNull('vin')
             ->where('vin', '!=', '')
             ->where('reserved', false)
-            ->where('modele', $modele)
-            ->where('finition', $finition)
+            ->where('modele','like', '%'.$modele.'%')
+            ->where('finition','like', '%'.$finition.'%')
+            ->where('marque','like', '%'.$marque.'%')
             ->where(function ($q) use ($colorEx, $colorInt) {
-                $q->where('color_ex', $colorEx)->orWhere('color_int', $colorInt);
+                $q->where('color_ex','like', '%'.$colorEx.'%')->orWhere('color_int','like', '%'.$colorInt.'%');
             })
             ->orderBy('created_at', 'asc')
             ->get()

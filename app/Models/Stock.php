@@ -14,14 +14,15 @@ class Stock extends Model
     protected $fillable = [
         
         'modele',
-        'version',
+        //finition =version
+        'finition',
+        'marque',
         //numero_chassis=vin
         'vin',
         'numero_commande',//numero_commande
         'client',
         'type_client',
         'PGEO',
-        'finition',
         'color_ex',
         'color_ex_code',
         'color_int',
@@ -78,7 +79,7 @@ class Stock extends Model
 
         return $query->where(function ($q) use ($like, $name) {
             $q->where('modele', 'like', $like)
-                ->orWhere('version', 'like', $like)
+                ->orWhere('finition', 'like', $like)
                 ->orWhere('vin', 'like', $like)
                 ->orWhere('numero_commande', 'like', $like)
                 ->orWhere('color_ex', 'like', $like)

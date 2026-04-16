@@ -38,8 +38,8 @@ class listStockAproximit extends FormRequest
     {
         return [
             'modele' => ['required', 'string', 'max:45'],
+            'marque' => ['required', 'string', 'max:45'],
             'version' => ['required', 'string', 'max:45'],
-            'finition' => ['required', 'string', 'max:45'],
             'color_ex' => ['required', 'string', 'max:45'],
             'color_int' => ['required', 'string', 'max:45'],
             'paginated' => ['sometimes', 'boolean'],
