@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\DemandeMotif;
 use App\Models\DemandeReservation;
 use App\Models\Stock;
 use App\Traits\ApiResponsable;
@@ -20,13 +21,17 @@ class ExternalSyncController extends Controller
     public function syncCommande(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'numero_commande' => 'required|string|max:45',
-            'vin'             => 'nullable|string|max:45',
-            'vendeur'         => 'required|string|max:45',
-            'date_commande'   => 'required|date_format:Y-m-d',
-            'date_livraison'  => 'required|date_format:Y-m-d',
-            'net_a_payer'     => 'required|numeric|min:0',
-            'statut'          => 'sometimes|string|max:45',
+            'numero_commande'              => 'required|string|max:45',
+            'vin'                          => 'nullable|string|max:45',
+            'vendeur'                      => 'required|string|max:45',
+            'date_commande'                => 'required|date_format:Y-m-d',
+            'date_livraison'               => 'required|date_format:Y-m-d',
+            'net_a_payer'                  => 'required|numeric|min:0',
+            'statut'                       => 'sometimes|string|max:45',
+            'motifs'                       => 'sometimes|array',
+            'motifs.*.motifs_description'  => 'nullable|string|max:45',
+            'motifs.*.file_path'           => 'nullable|string|max:255',
+            'motifs.*.file_type'           => 'nullable|string|max:45',
         ]);
 
         // Try to find matching stock by VIN — optional
@@ -48,11 +53,23 @@ class ExternalSyncController extends Controller
             ]
         );
 
+        if (!empty($data['motifs'])) {
+            $demande->demandeMotifs()->delete();
+            foreach ($data['motifs'] as $motif) {
+                DemandeMotif::create([
+                    'demandes_reservation_id' => $demande->id,
+                    'motifs_description'      => $motif['motifs_description'] ?? null,
+                    'file_path'               => $motif['file_path'] ?? null,
+                    'file_type'               => $motif['file_type'] ?? null,
+                ]);
+            }
+        }
+
         $statusCode = $demande->wasRecentlyCreated ? 201 : 200;
 
         return response()->json([
             'message' => $demande->wasRecentlyCreated ? 'Demande créée.' : 'Demande mise à jour.',
-            'data'    => $demande,
+            'data'    => $demande->load('demandeMotifs'),
         ], $statusCode);
     }
 }
