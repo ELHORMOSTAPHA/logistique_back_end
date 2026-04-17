@@ -24,6 +24,13 @@ Route::middleware('api.key')->prefix('external')->group(function () {
     Route::post('/sync-commande', [ExternalSyncController::class, 'syncCommande']);
 });
 
+// Serve public storage files (bypasses php artisan serve symlink limitation)
+Route::get('/files/{path}', function (string $path) {
+    $fullPath = storage_path('app/public/' . $path);
+    abort_if(! file_exists($fullPath), 404);
+    return response()->file($fullPath);
+})->where('path', '.*');
+
 // Routes publiques (sans authentification)
 Route::prefix('auth')->group(function () {
     Route::post('/refresh', [AuthController::class, 'refresh']);

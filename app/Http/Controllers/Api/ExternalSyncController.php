@@ -9,6 +9,7 @@ use App\Models\Stock;
 use App\Traits\ApiResponsable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class ExternalSyncController extends Controller
 {
@@ -32,6 +33,8 @@ class ExternalSyncController extends Controller
             'motifs.*.motifs_description'  => 'nullable|string|max:45',
             'motifs.*.file_path'           => 'nullable|string|max:255',
             'motifs.*.file_type'           => 'nullable|string|max:45',
+            'motifs.*.file_content'        => 'nullable|string',
+            'motifs.*.file_name'           => 'nullable|string|max:255',
         ]);
 
         // Try to find matching stock by VIN — optional
@@ -56,10 +59,22 @@ class ExternalSyncController extends Controller
         if (!empty($data['motifs'])) {
             $demande->demandeMotifs()->delete();
             foreach ($data['motifs'] as $motif) {
+                $storedPath = null;
+
+                if (!empty($motif['file_content']) && !empty($motif['file_name'])) {
+                    $decoded = base64_decode($motif['file_content'], strict: true);
+                    if ($decoded !== false) {
+                        $ext        = pathinfo($motif['file_name'], PATHINFO_EXTENSION);
+                        $filename   = 'demande_motifs/' . $demande->id . '_' . uniqid() . ($ext ? '.' . $ext : '');
+                        Storage::disk('public')->put($filename, $decoded);
+                        $storedPath = $filename; // relative: demande_motifs/xxx.ext
+                    }
+                }
+
                 DemandeMotif::create([
                     'demandes_reservation_id' => $demande->id,
                     'motifs_description'      => $motif['motifs_description'] ?? null,
-                    'file_path'               => $motif['file_path'] ?? null,
+                    'file_path'               => $storedPath ?? $motif['file_path'] ?? null,
                     'file_type'               => $motif['file_type'] ?? null,
                 ]);
             }
