@@ -73,7 +73,7 @@ class StockService
     public function listStockAproximit(array $query): Collection|array
     {
         //trim and clean and lowercase all the query parameters
-        $marque= (string) $query['marque'];
+        $marque = (string) $query['marque'];
         $modele = (string) $query['modele'];
         $finition = (string) $query['version'];
         $colorEx = (string) $query['color_ex'];
@@ -81,11 +81,11 @@ class StockService
         $finition = (string) $query['version'];
 
         $group1 = Stock::query()
-            ->where('modele','like', '%'.$modele.'%')
-            ->where('marque','like', '%'.$marque.'%')
-            ->where('finition','like', '%'.$finition.'%')
-            ->where('color_ex','like', '%'.$colorEx.'%')
-            ->where('color_int','like', '%'.$colorInt.'%')
+            ->where('modele', 'like', '%' . $modele . '%')
+            ->where('marque', 'like', '%' . $marque . '%')
+            ->where('finition', 'like', '%' . $finition . '%')
+            ->where('color_ex', 'like', '%' . $colorEx . '%')
+            ->where('color_int', 'like', '%' . $colorInt . '%')
             ->whereNotNull('vin')
             ->where('vin', '!=', '')
             ->where('reserved', false)
@@ -100,11 +100,11 @@ class StockService
             ->where(function ($q) {
                 $q->whereNull('vin')->orWhere('vin', '');
             })
-            ->where('modele','like', '%'.$modele.'%')
-            ->where('marque','like', '%'.$marque.'%')
-            ->where('finition','like', '%'.$finition.'%')
-            ->where('color_ex','like', '%'.$colorEx.'%')
-            ->where('color_int','like', '%'.$colorInt.'%')
+            ->where('modele', 'like', '%' . $modele . '%')
+            ->where('marque', 'like', '%' . $marque . '%')
+            ->where('finition', 'like', '%' . $finition . '%')
+            ->where('color_ex', 'like', '%' . $colorEx . '%')
+            ->where('color_int', 'like', '%' . $colorInt . '%')
             ->where('reserved', false)
             ->orderBy('created_at', 'asc')
             ->get()
@@ -119,15 +119,15 @@ class StockService
             ->whereNotNull('vin')
             ->where('vin', '!=', '')
             ->where('reserved', false)
-            ->where('modele','like', '%'.$modele.'%')
-            ->where('finition','like', '%'.$finition.'%')
-            ->where('marque','like', '%'.$marque.'%')
+            ->where('modele', 'like', '%' . $modele . '%')
+            ->where('finition', 'like', '%' . $finition . '%')
+            ->where('marque', 'like', '%' . $marque . '%')
             ->where(function ($q) use ($colorEx, $colorInt) {
-                $q->where('color_ex','like', '%'.$colorEx.'%')->orWhere('color_int','like', '%'.$colorInt.'%');
+                $q->where('color_ex', 'like', '%' . $colorEx . '%')->orWhere('color_int', 'like', '%' . $colorInt . '%');
             })
             ->orderBy('created_at', 'asc')
             ->get()
-            ->reject(fn (Stock $s) => in_array($s->id, $group1Ids, true))
+            ->reject(fn(Stock $s) => in_array($s->id, $group1Ids, true))
             ->values()
             ->map(function (Stock $s) {
                 $s->setAttribute('in_arrivage', false);
@@ -161,6 +161,57 @@ class StockService
         );
 
         return PaginationPayload::fromPaginator($paginator);
+    }
+
+    /**
+     * Recherche le premier véhicule correspondant à l'identité (marque, modele, finition, color_ex, color_int).
+     *
+     * Priorité :
+     * 1) Le véhicule le plus ancien avec VIN non vide et non réservé  → `has_vin = true`.
+     * 2) Si aucun résultat, le véhicule le plus ancien sans VIN (NULL / vide) et non réservé → `has_vin = false`.
+     *
+     * @param  array<string, mixed>  $query
+     */
+    public function getOldVinInStock(array $query): ?Stock
+    {
+        $marque   = (string) $query['marque'];
+        $modele   = (string) $query['modele'];
+        $finition = (string) $query['version'];
+        $colorEx  = (string) $query['color_ex'];
+        $colorInt = (string) $query['color_int'];
+
+        $baseQuery = fn() => Stock::query()
+            ->where('marque',   'like', '%' . $marque . '%')
+            ->where('modele',   'like', '%' . $modele . '%')
+            ->where('finition', 'like', '%' . $finition . '%')
+            ->where('color_ex', 'like', '%' . $colorEx . '%')
+            ->where('color_int', 'like', '%' . $colorInt . '%')
+            ->where('reserved', false)
+            ->orderBy('created_at', 'asc');
+
+        // Groupe 1 : VIN renseigné
+        $stock = $baseQuery()
+            ->whereNotNull('vin')
+            ->where('vin', '!=', '')
+            ->first();
+
+        if ($stock) {
+            $stock->setAttribute('in_arrivage', false);
+            return $stock;
+        }
+
+        // Groupe 2 : fallback sans VIN
+        $stock = $baseQuery()
+            ->where(function ($q) {
+                $q->whereNull('vin')->orWhere('vin', '');
+            })
+            ->first();
+
+        if ($stock) {
+            $stock->setAttribute('in_arrivage', true);
+        }
+
+        return $stock;
     }
 
     /**
@@ -234,7 +285,7 @@ class StockService
 
         return $stock;
     }
-    
+
     /**
      * Import stock rows from a validated JSON batch. Each row runs in its own
      * transaction so one failure does not roll back siblings in the batch.
@@ -261,17 +312,19 @@ class StockService
         foreach ($rows as $index => $row) {
             $lineNo = $index + 1;
             $vinRaw = isset($row['vin']) ? trim((string) $row['vin']) : '';
-            $lineLabel = 'Ligne '.$lineNo.($vinRaw !== '' ? ' (VIN: '.$vinRaw.')' : '');
+            $lineLabel = 'Ligne ' . $lineNo . ($vinRaw !== '' ? ' (VIN: ' . $vinRaw . ')' : '');
 
             if ($importMode === 'stock_feed') {
                 $missing = [];
-                foreach ([
-                    'numero_commande' => 'N° cde',
-                    'modele' => 'Modèle',
-                    'finition' => 'Finition',
-                    'color_ex' => 'Couleur Extérieure',
-                    'color_int' => 'Couleur Intérieure',
-                ] as $field => $label) {
+                foreach (
+                    [
+                        'numero_commande' => 'N° cde',
+                        'modele' => 'Modèle',
+                        'finition' => 'Finition',
+                        'color_ex' => 'Couleur Extérieure',
+                        'color_int' => 'Couleur Intérieure',
+                    ] as $field => $label
+                ) {
                     $val = $row[$field] ?? null;
                     if ($val === null || (is_string($val) && trim($val) === '')) {
                         $missing[] = $label;
@@ -280,7 +333,7 @@ class StockService
 
                 if ($missing !== []) {
                     $skipped++;
-                    $messages[] = $lineLabel.' — champ(s) obligatoire(s) manquant(s): '.implode(', ', $missing).'.';
+                    $messages[] = $lineLabel . ' — champ(s) obligatoire(s) manquant(s): ' . implode(', ', $missing) . '.';
                     continue;
                 }
             }
@@ -295,10 +348,10 @@ class StockService
                         ]));
                         $created++;
                     });
-                    $createdDetails[] = $lineLabel.' — Nouvelle ligne créée (sans N° châssis dans le fichier).';
+                    $createdDetails[] = $lineLabel . ' — Nouvelle ligne créée (sans N° châssis dans le fichier).';
                 } catch (\Throwable $e) {
                     $skipped++;
-                    $messages[] = $lineLabel.' — '.$e->getMessage();
+                    $messages[] = $lineLabel . ' — ' . $e->getMessage();
                 }
 
                 continue;
@@ -308,7 +361,7 @@ class StockService
 
             if ($placeholder === null) {
                 $skipped++;
-                $messages[] = $lineLabel.' — Aucune ligne sans VIN ne correspond (modèle, finition, couleurs).';
+                $messages[] = $lineLabel . ' — Aucune ligne sans VIN ne correspond (modèle, finition, couleurs).';
 
                 continue;
             }
@@ -321,11 +374,11 @@ class StockService
                     ]));
                     $updated++;
                 });
-                $updatedDetails[] = $lineLabel.' — Correspondance sans VIN #'.$placeholder->getKey()
-                    .' : mise à jour avec ce N° châssis.';
+                $updatedDetails[] = $lineLabel . ' — Correspondance sans VIN #' . $placeholder->getKey()
+                    . ' : mise à jour avec ce N° châssis.';
             } catch (\Throwable $e) {
                 $skipped++;
-                $messages[] = $lineLabel.' — '.$e->getMessage();
+                $messages[] = $lineLabel . ' — ' . $e->getMessage();
             }
         }
 
@@ -340,8 +393,59 @@ class StockService
         ];
     }
 
+    /**     * Map validated store payload to Stock DB columns.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function stockCreateAttributes(array $data): array
+    {
+        return array_filter([
+            'modele'        => $data['modele'] ?? null,
+            'finition'      => $data['version'] ?? null,
+            'vin'           => $data['vin'] ?? null,
+            'color_ex'      => $data['color_ex'] ?? null,
+            'color_ex_code' => $data['color_ex_code'] ?? null,
+            'color_int'     => $data['color_int'] ?? null,
+            'color_int_code' => $data['color_int_code'] ?? null,
+            'reserved'      => $data['reserved'] ?? false,
+            'depot_id'      => isset($data['depot_id']) ? (int) $data['depot_id'] : null,
+            'lot_id'        => isset($data['lot_id']) ? (int) $data['lot_id'] : null,
+        ], fn($v) => $v !== null);
+    }
+
     /**
-     * Ligne `stocks` avec vin NULL dont (modele, finition, color_ex, color_int)
+     * Map validated update payload to Stock DB columns (only present keys).
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function stockUpdateAttributes(array $data): array
+    {
+        $map = [
+            'modele'         => 'modele',
+            'version'        => 'finition',
+            'vin'            => 'vin',
+            'color_ex'       => 'color_ex',
+            'color_ex_code'  => 'color_ex_code',
+            'color_int'      => 'color_int',
+            'color_int_code' => 'color_int_code',
+            'reserved'       => 'reserved',
+            'depot_id'       => 'depot_id',
+            'lot_id'         => 'lot_id',
+        ];
+
+        $out = [];
+        foreach ($map as $inputKey => $column) {
+            if (array_key_exists($inputKey, $data)) {
+                $out[$column] = $data[$inputKey];
+            }
+        }
+
+        return $out;
+    }
+
+    /**     * Ligne `stocks` avec vin NULL dont (modele, finition, color_ex, color_int)
      * correspondent à l’import (chaînes vides / null traitées comme « vides »).
      */
     private function findStockWithoutVinMatchingIdentity(array $row): ?Stock
