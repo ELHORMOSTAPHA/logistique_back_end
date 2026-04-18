@@ -21,11 +21,15 @@ class DemandeReservationService
         $f = QueryFilterNormalizer::demandeReservation($query);
         $builder = DemandeReservation::query()->with(['stock', 'demandeMotifs']);
 
-        if ($f['stock_id'] !== null) {
-            $builder->where('stock_id', $f['stock_id']);
-        }
+        // Hide accepted demandes from the list by default
         if ($f['statut'] !== null) {
             $builder->where('statut', 'like', '%'.addcslashes($f['statut'], '%_\\').'%');
+        } else {
+            $builder->where('statut', '!=', 'accepté');
+        }
+
+        if ($f['stock_id'] !== null) {
+            $builder->where('stock_id', $f['stock_id']);
         }
         if ($f['id_demande'] !== null) {
             $builder->where('id_demande', 'like', '%'.addcslashes($f['id_demande'], '%_\\').'%');
@@ -110,7 +114,7 @@ class DemandeReservationService
 
         // Notify CRM when demand is accepted
         if (($validated['statut'] ?? null) === 'accepté' && $row->id_demande) {
-            $this->syncOrderStatusToCrm((string) $row->id_demande, 'validee');
+            $this->syncOrderStatusToCrm((string) $row->id_demande, 'reservee');
         }
 
         return $row->fresh()->load(['stock', 'demandeMotifs']);
