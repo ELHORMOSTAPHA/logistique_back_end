@@ -103,4 +103,27 @@ class DemandeReservationController extends Controller
             return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
         }
     }
+
+    public function matchingVin(DemandeReservation $demande_reservation): JsonResponse
+    {
+        try {
+            $stocks = $this->demandeReservationService->getMatchingVinStock($demande_reservation);
+            return $this->success($stocks, MessageKey::FETCHED);
+        } catch (\Exception $e) {
+            return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
+        }
+    }
+
+    public function modifierVin(AffecterVinRequest $request, DemandeReservation $demande_reservation): JsonResponse
+    {
+        try {
+            $updated = $this->demandeReservationService->modifierVin($demande_reservation, $request->validated());
+            if (! $updated) {
+                return $this->error(MessageKey::NOT_FOUND, null, 404);
+            }
+            return $this->success($updated, MessageKey::UPDATED);
+        } catch (\Exception $e) {
+            return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
+        }
+    }
 }

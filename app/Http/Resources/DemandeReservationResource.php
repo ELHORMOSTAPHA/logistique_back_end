@@ -15,6 +15,7 @@ class DemandeReservationResource extends JsonResource
         return [
             'id' => $this->id,
             'stock_id' => $this->stock_id,
+            'vin' => $this->vin,
             'vehicle_marque' => $this->vehicle_marque,
             'vehicle_modele' => $this->vehicle_modele,
             'vehicle_finition' => $this->vehicle_finition,

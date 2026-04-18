@@ -58,6 +58,8 @@ Route::middleware('jwt.auth')->group(function () {
     Route::apiResource('demande_reservation', DemandeReservationController::class);
     Route::get('demande_reservation/{demande_reservation}/matching-stock',  [DemandeReservationController::class, 'matchingStock']);
     Route::post('demande_reservation/{demande_reservation}/affecter-vin',   [DemandeReservationController::class, 'affecterVin']);
+    Route::get('demande_reservation/{demande_reservation}/matching-vin',    [DemandeReservationController::class, 'matchingVin']);
+    Route::post('demande_reservation/{demande_reservation}/modifier-vin',   [DemandeReservationController::class, 'modifierVin']);
     //utilisateur — routes dédiées avant apiResource (sinon "bulk-update-status" est pris pour un id)
     Route::post('utilisateur/bulk-update-status', [UtilisateurController::class, 'bulkUpdateStatus']);
     Route::apiResource('utilisateur', UtilisateurController::class);
