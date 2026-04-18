@@ -66,7 +66,8 @@ Route::middleware('jwt.auth')->group(function () {
     Route::apiResource('profile', ProfileController::class);
 
 });
-//to get brearer token lance this commande first #  php artisan integration:client:create "crm_exeedd" --scopes=integration.test --ttl=3600
+//to get brearer token lance this commande first
+#  php artisan integration:client:create "crm_exeedd" --scopes=integration.test --ttl=3600
 //then make request to this url http://localhost:8000/api/integration/token with the following headers:
 //Authorization: Bearer <INTEGRATION_API_TOKEN>
 //Content-Type: application/json
@@ -93,8 +94,10 @@ Route::prefix('integration')->middleware('integration.auth')->group(function () 
         ]);
     });
     //stock
-   Route::prefix('stock')->group(function () {
-    //list stock aproximit
-    Route::get('/', [StockController::class, 'listStockAproximit']);
-   });
+    Route::prefix('stock')->group(function () {
+        //list stock aproximit
+        Route::get('/', [StockController::class, 'listStockAproximit']);
+        // recherche ancien VIN (ou placeholder sans VIN) par identité véhicule
+        Route::get('/old-vin', [StockController::class, 'getOldVinInStock']);
+    });
 });
