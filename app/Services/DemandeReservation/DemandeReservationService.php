@@ -3,9 +3,12 @@
 namespace App\Services\DemandeReservation;
 
 use App\Models\DemandeReservation;
+use App\Models\Stock;
 use App\Support\PaginationPayload;
 use App\Support\QueryFilterNormalizer;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use App\Http\Resources\DemandeReservationResource;
 class DemandeReservationService
 {
@@ -105,7 +108,142 @@ class DemandeReservationService
             $row->update($data);
         }
 
+        // Notify CRM when demand is accepted
+        if (($validated['statut'] ?? null) === 'accepté' && $row->id_demande) {
+            $this->syncOrderStatusToCrm((string) $row->id_demande, 'validee');
+        }
+
         return $row->fresh()->load(['stock', 'demandeMotifs']);
+    }
+
+    /**
+     * Returns available stocks matching the demande vehicle identity, FIFO order.
+     * Group 1: stocks with VIN (oldest first).
+     * Group 2: arrivage placeholders without VIN (oldest first).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getMatchingStock(DemandeReservation $demande): array
+    {
+        $stock = $demande->stock;
+        if (! $stock) {
+            return [];
+        }
+
+        $modele   = (string) $stock->modele;
+        $finition = (string) $stock->finition;
+        $colorEx  = (string) $stock->color_ex;
+        $colorInt = (string) $stock->color_int;
+        $marque   = (string) $stock->marque;
+
+        $baseQuery = fn () => Stock::query()
+            ->where('marque',   'like', '%' . $marque   . '%')
+            ->where('modele',   'like', '%' . $modele   . '%')
+            ->where('finition', 'like', '%' . $finition . '%')
+            ->where('color_ex', 'like', '%' . $colorEx  . '%')
+            ->where('color_int','like', '%' . $colorInt . '%')
+            ->where('reserved', false)
+            ->orderBy('created_at', 'asc');
+
+        $toRow = function (Stock $s, bool $inArrivage) {
+            $createdAt = Carbon::parse($s->created_at);
+            return [
+                'id'            => $s->id,
+                'vin'           => $s->vin,
+                'has_vin'       => ! empty($s->vin),
+                'in_arrivage'   => $inArrivage,
+                'marque'        => $s->marque,
+                'modele'        => $s->modele,
+                'finition'      => $s->finition,
+                'color_ex'      => $s->color_ex,
+                'color_int'     => $s->color_int,
+                'stock_age_days'=> (int) $createdAt->diffInDays(now()),
+                'created_at'    => $s->created_at,
+            ];
+        };
+
+        $withVin = $baseQuery()
+            ->whereNotNull('vin')->where('vin', '!=', '')
+            ->get()->map(fn ($s) => $toRow($s, false));
+
+        $withoutVin = $baseQuery()
+            ->where(fn ($q) => $q->whereNull('vin')->orWhere('vin', ''))
+            ->get()->map(fn ($s) => $toRow($s, true));
+
+        return $withVin->concat($withoutVin)->values()->all();
+    }
+
+    /**
+     * Assigns a stock to the demande, marks it reserved, sets statut = 'accepté'.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function affecterVin(DemandeReservation $demande, array $data): ?DemandeReservation
+    {
+        $stock = Stock::query()->find((int) $data['stock_id']);
+        if (! $stock) {
+            return null;
+        }
+
+        // Mark stock reserved
+        $stock->update(['reserved' => true]);
+
+        // Update demande
+        $demande->update([
+            'stock_id' => $stock->id,
+            'vin'      => $stock->vin ?: null,
+            'statut'   => 'accepté',
+        ]);
+
+        // Sync to CRM
+        if ($demande->id_demande) {
+            $this->syncOrderStatusToCrm((string) $demande->id_demande, 'validee');
+        }
+
+        return $demande->fresh()->load(['stock', 'demandeMotifs']);
+    }
+
+    private function syncOrderStatusToCrm(string $orderId, string $statut): void
+    {
+        $crmUrl  = rtrim((string) config('app.crm_url'), '/');
+        $apiKey  = (string) config('app.crm_api_key');
+
+        if (! $crmUrl || ! $apiKey) {
+            Log::warning('[CrmSync] CRM_URL or CRM_API_KEY not configured.');
+            return;
+        }
+
+        $endpoint = $crmUrl . '/orders/ordersapi/update_order_status';
+        $payload  = json_encode(['order_id' => $orderId, 'statut' => $statut]);
+
+        $ch = curl_init($endpoint);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $payload,
+            CURLOPT_HTTPHEADER     => [
+                'Content-Type: application/json',
+                'Accept: application/json',
+                'X-Api-Key: ' . $apiKey,
+            ],
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS      => 3,
+            CURLOPT_TIMEOUT        => 8,
+        ]);
+
+        $response  = curl_exec($ch);
+        $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlError || $httpCode < 200 || $httpCode >= 300) {
+            Log::error(sprintf(
+                '[CrmSync] Failed to update order #%s in CRM. http=%s curl_err=%s body=%s',
+                $orderId, $httpCode, $curlError ?: '-', is_string($response) ? $response : 'null'
+            ));
+        } else {
+            Log::info(sprintf('[CrmSync] Order #%s status set to "%s" in CRM. HTTP %s', $orderId, $statut, $httpCode));
+        }
     }
 
     public function delete(int $id): bool

@@ -25,6 +25,11 @@ class DemandeReservation extends Model
         'date_commande',
         'date_livraison',
         'net_a_payer',
+        'vehicle_marque',
+        'vehicle_modele',
+        'vehicle_finition',
+        'vehicle_color_ex',
+        'vehicle_color_int',
     ];
 
     public function stock(): BelongsTo

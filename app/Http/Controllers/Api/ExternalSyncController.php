@@ -29,6 +29,11 @@ class ExternalSyncController extends Controller
             'date_livraison'               => 'required|date_format:Y-m-d',
             'net_a_payer'                  => 'required|numeric|min:0',
             'statut'                       => 'sometimes|string|max:45',
+            'vehicle_marque'               => 'nullable|string|max:100',
+            'vehicle_modele'               => 'nullable|string|max:100',
+            'vehicle_finition'             => 'nullable|string|max:100',
+            'vehicle_color_ex'             => 'nullable|string|max:100',
+            'vehicle_color_int'            => 'nullable|string|max:100',
             'motifs'                       => 'sometimes|array',
             'motifs.*.motifs_description'  => 'nullable|string|max:45',
             'motifs.*.file_path'           => 'nullable|string|max:255',
@@ -46,13 +51,18 @@ class ExternalSyncController extends Controller
         $demande = DemandeReservation::updateOrCreate(
             ['id_demande' => $data['numero_commande']],
             [
-                'stock_id'       => $stock?->id,
-                'vin'            => $data['vin'] ?? null,
-                'nom_commercial' => $data['vendeur'],
-                'date_commande'  => $data['date_commande'],
-                'date_livraison' => $data['date_livraison'],
-                'net_a_payer'    => $data['net_a_payer'],
-                'statut'         => $data['statut'] ?? 'en cours',
+                'stock_id'          => $stock?->id,
+                'vin'               => $data['vin'] ?? null,
+                'nom_commercial'    => $data['vendeur'],
+                'date_commande'     => $data['date_commande'],
+                'date_livraison'    => $data['date_livraison'],
+                'net_a_payer'       => $data['net_a_payer'],
+                'statut'            => $data['statut'] ?? 'en cours',
+                'vehicle_marque'    => $data['vehicle_marque'] ?? null,
+                'vehicle_modele'    => $data['vehicle_modele'] ?? null,
+                'vehicle_finition'  => $data['vehicle_finition'] ?? null,
+                'vehicle_color_ex'  => $data['vehicle_color_ex'] ?? null,
+                'vehicle_color_int' => $data['vehicle_color_int'] ?? null,
             ]
         );
 
