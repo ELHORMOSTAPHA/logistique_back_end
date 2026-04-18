@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Stock\ChangeDepotStockRequest;
 use App\Http\Requests\Stock\ImportStockRequest;
+use App\Http\Requests\Stock\PreviewVinUpdateRequest;
 use App\Http\Requests\Stock\listStockAproximit;
 use App\Http\Requests\Stock\IndexStockRequest;
 use App\Http\Requests\Stock\StoreStockRequest;
@@ -120,6 +121,21 @@ class StockController extends Controller
                 (string) $request->validated('import_mode', 'stock_feed')
             );
             return $this->success($result, MessageKey::CREATED);
+        } catch (\Exception $e) {
+            return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Prévisualisation des correspondances pour « Mise à jour VIN » (aucune écriture en base).
+     * POST /api/stock/preview-vin-update
+     */
+    public function previewVinUpdate(PreviewVinUpdateRequest $request): JsonResponse
+    {
+        try {
+            $data = $this->stockService->previewVinUpdate($request->validated('lines', []));
+
+            return $this->success($data, MessageKey::FETCHED);
         } catch (\Exception $e) {
             return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
         }

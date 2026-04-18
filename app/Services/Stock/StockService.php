@@ -239,11 +239,11 @@ class StockService
      * Import stock rows from a validated JSON batch. Each row runs in its own
      * transaction so one failure does not roll back siblings in the batch.
      *
-     * Rules:
-     * - VIN vide / absent : création d’une nouvelle ligne avec les données reçues.
-     * - VIN renseigné : recherche d’une ligne existante avec `vin` NULL et les mêmes
-     *   (modele, finition, color_ex, color_int) ; si trouvée, mise à jour (dont le VIN) ;
-     *   sinon la ligne est ignorée et un message est ajouté.
+     * - `stock_feed` (Alimenter stock) : chaque ligne valide crée un **nouveau** stock ;
+     *   aucune recherche / fusion avec une ligne existante.
+     * - `vin_update` (Mise à jour VIN) : pour chaque ligne, refus si le N° châssis existe déjà sur un autre
+     *   véhicule ; sinon recherche d’un stock sans N° châssis avec la même commande + marque + modèle +
+     *   finition + couleurs ; mise à jour du VIN et optionnellement du n° de lot si fournis.
      *
      * @param  array<int, array<string, mixed>>  $rows
      * @return array{total: int, created: int, updated: int, skipped: int, messages: array<int, string>, created_details: array<int, string>, updated_details: array<int, string>}
@@ -267,6 +267,7 @@ class StockService
                 $missing = [];
                 foreach ([
                     'numero_commande' => 'N° cde',
+                    'marque' => 'Marque',
                     'modele' => 'Modèle',
                     'finition' => 'Finition',
                     'color_ex' => 'Couleur Extérieure',
@@ -283,9 +284,7 @@ class StockService
                     $messages[] = $lineLabel.' — champ(s) obligatoire(s) manquant(s): '.implode(', ', $missing).'.';
                     continue;
                 }
-            }
 
-            if ($vinRaw === '') {
                 try {
                     DB::transaction(function () use ($row, $userId, &$created) {
                         $attrs = $this->stockAttributesFromImportRow($row);
@@ -295,7 +294,7 @@ class StockService
                         ]));
                         $created++;
                     });
-                    $createdDetails[] = $lineLabel.' — Nouvelle ligne créée (sans N° châssis dans le fichier).';
+                    $createdDetails[] = $lineLabel.' — Nouvelle ligne créée.';
                 } catch (\Throwable $e) {
                     $skipped++;
                     $messages[] = $lineLabel.' — '.$e->getMessage();
@@ -304,25 +303,60 @@ class StockService
                 continue;
             }
 
-            $placeholder = $this->findStockWithoutVinMatchingIdentity($row);
+            // import_mode === vin_update : mise à jour du VIN (+ lot optionnel) sur véhicule sans châssis
+            $missingVinUpdate = [];
+            foreach ([
+                'vin' => 'N° châssis',
+                'numero_commande' => 'N° cde',
+                'marque' => 'Marque',
+                'modele' => 'Modèle',
+                'finition' => 'Finition',
+                'color_ex' => 'Couleur Extérieure',
+                'color_int' => 'Couleur Intérieure',
+            ] as $field => $label) {
+                $val = $row[$field] ?? null;
+                if ($val === null || (is_string($val) && trim($val) === '')) {
+                    $missingVinUpdate[] = $label;
+                }
+            }
 
-            if ($placeholder === null) {
+            if ($missingVinUpdate !== []) {
                 $skipped++;
-                $messages[] = $lineLabel.' — Aucune ligne sans VIN ne correspond (modèle, finition, couleurs).';
+                $messages[] = $lineLabel.' — champ(s) obligatoire(s) manquant(s): '.implode(', ', $missingVinUpdate).'.';
+
+                continue;
+            }
+
+            if ($this->vinIsAlreadyAssignedToAStock($vinRaw)) {
+                $skipped++;
+                $messages[] = $lineLabel.' — Ce N° châssis est déjà attribué à un autre véhicule.';
+
+                continue;
+            }
+
+            $target = $this->findStockForVinUpdateMatch($row);
+
+            if ($target === null) {
+                $skipped++;
+                $messages[] = $lineLabel.' — Aucun véhicule sans N° châssis ne correspond (commande, marque, modèle, finition, couleurs).';
 
                 continue;
             }
 
             try {
-                DB::transaction(function () use ($row, $userId, $placeholder, &$updated) {
-                    $attrs = $this->stockAttributesFromImportRow($row);
-                    $placeholder->update(array_merge($attrs, [
+                DB::transaction(function () use ($row, $userId, $target, $vinRaw, &$updated) {
+                    $attrs = [
+                        'vin' => $vinRaw,
                         'updated_by' => $userId,
-                    ]));
+                    ];
+                    $lotRaw = isset($row['numero_lot']) ? trim((string) $row['numero_lot']) : '';
+                    if ($lotRaw !== '') {
+                        $attrs['numero_lot'] = $lotRaw;
+                    }
+                    $target->update($attrs);
                     $updated++;
                 });
-                $updatedDetails[] = $lineLabel.' — Correspondance sans VIN #'.$placeholder->getKey()
-                    .' : mise à jour avec ce N° châssis.';
+                $updatedDetails[] = $lineLabel.' — Stock #'.$target->getKey().' : N° châssis mis à jour.';
             } catch (\Throwable $e) {
                 $skipped++;
                 $messages[] = $lineLabel.' — '.$e->getMessage();
@@ -341,25 +375,108 @@ class StockService
     }
 
     /**
-     * Ligne `stocks` avec vin NULL dont (modele, finition, color_ex, color_int)
-     * correspondent à l’import (chaînes vides / null traitées comme « vides »).
+     * Indique si ce N° châssis est déjà enregistré sur un véhicule (unicité).
      */
-    private function findStockWithoutVinMatchingIdentity(array $row): ?Stock
+    private function vinIsAlreadyAssignedToAStock(string $vin): bool
     {
-        $query = Stock::query()->whereNull('vin');
+        $vin = trim($vin);
+        if ($vin === '') {
+            return false;
+        }
 
-        foreach (['modele', 'finition', 'color_ex', 'color_int'] as $field) {
+        return Stock::query()
+            ->where('vin', $vin)
+            ->whereNotNull('vin')
+            ->where('vin', '!=', '')
+            ->exists();
+    }
+
+    /**
+     * Véhicule sans N° châssis dont commande + identité correspondent à la ligne fichier.
+     *
+     * @param  array<string, mixed>  $row
+     */
+    public function findStockForVinUpdateMatch(array $row): ?Stock
+    {
+        $query = Stock::query()->where(function ($q) {
+            $q->whereNull('vin')->orWhere('vin', '');
+        });
+
+        foreach (['numero_commande', 'marque', 'modele', 'finition', 'color_ex', 'color_int'] as $field) {
             $raw = $row[$field] ?? null;
-            if ($raw === null || (is_string($raw) && trim($raw) === '')) {
-                $query->where(function ($q) use ($field) {
-                    $q->whereNull($field)->orWhere($field, '');
-                });
-            } else {
-                $query->where($field, is_string($raw) ? trim($raw) : (string) $raw);
-            }
+            $val = is_string($raw) ? trim($raw) : trim((string) $raw);
+            $query->where($field, $val);
         }
 
         return $query->first();
+    }
+
+    /**
+     * Prévisualisation des mises à jour VIN (sans écrire en base).
+     *
+     * @param  array<int, array<string, mixed>>  $lines  Chaque entrée contient `line_no` + champs import.
+     * @return array{matched: array<int, mixed>, unmatched: array<int, mixed>}
+     */
+    public function previewVinUpdate(array $lines): array
+    {
+        $matched = [];
+        $unmatched = [];
+
+        foreach ($lines as $item) {
+            $lineNo = (int) ($item['line_no'] ?? 0);
+            $row = $item;
+            unset($row['line_no']);
+
+            $vin = isset($row['vin']) ? trim((string) $row['vin']) : '';
+
+            if ($vin !== '' && $this->vinIsAlreadyAssignedToAStock($vin)) {
+                $unmatched[] = [
+                    'line_no' => $lineNo,
+                    'reason' => 'Ce N° châssis est déjà attribué à un autre véhicule.',
+                    'row' => $row,
+                ];
+
+                continue;
+            }
+
+            $stock = $this->findStockForVinUpdateMatch($row);
+
+            if ($stock === null) {
+                $unmatched[] = [
+                    'line_no' => $lineNo,
+                    'reason' => 'Aucun véhicule sans N° châssis ne correspond (même commande, marque, modèle, finition, couleurs).',
+                    'row' => $row,
+                ];
+
+                continue;
+            }
+            $lotRaw = isset($row['numero_lot']) ? trim((string) $row['numero_lot']) : '';
+            $newNumeroLot = $lotRaw !== '' ? $lotRaw : null;
+
+            $matched[] = [
+                'line_no' => $lineNo,
+                'stock_id' => $stock->getKey(),
+                'new_vin' => $vin,
+                'new_numero_lot' => $newNumeroLot,
+                'row' => $row,
+                'stock' => [
+                    'id' => $stock->id,
+                    'vin' => $stock->vin,
+                    'numero_commande' => $stock->numero_commande,
+                    'marque' => $stock->marque,
+                    'modele' => $stock->modele,
+                    'finition' => $stock->finition,
+                    'color_ex' => $stock->color_ex,
+                    'color_int' => $stock->color_int,
+                    'numero_lot' => $stock->numero_lot,
+                ],
+            ];
+        }
+
+        return [
+            'matched' => $matched,
+            'unmatched' => $unmatched,
+        ];
     }
 
     /**
@@ -379,6 +496,7 @@ class StockService
             'client' => 'client',
             'type_client' => 'type_client',
             'PGEO' => 'PGEO',
+            'marque' => 'marque',
             'modele' => 'modele',
             'finition' => 'finition',
             'options' => 'options',
@@ -390,6 +508,7 @@ class StockService
             'date_affectation' => 'date_affectation',
             'date_arrivage_reelle' => 'date_arrivage_reelle',
             'version' => 'version',
+            'numero_lot' => 'numero_lot',
         ];
 
         $dateColumns = [

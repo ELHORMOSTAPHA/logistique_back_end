@@ -37,6 +37,7 @@ Route::middleware('jwt.auth')->group(function () {
     // Import JSON rows (client parses .xlsx / .csv / .ods)
     Route::post('stock/import-stock', [StockController::class, 'importStock']);
     Route::post('stock/import', [StockController::class, 'importStock']);
+    Route::post('stock/preview-vin-update', [StockController::class, 'previewVinUpdate']);
     //depot
     Route::apiResource('depot', DepotController::class);
     //historique
