@@ -25,7 +25,7 @@ class DepotHistorique extends Model
     protected function casts(): array
     {
         return [
-            'created_at' => 'date',
+            'created_at' => 'datetime',
         ];
     }
 
@@ -37,5 +37,10 @@ class DepotHistorique extends Model
     public function depot(): BelongsTo
     {
         return $this->belongsTo(Depot::class);
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 }

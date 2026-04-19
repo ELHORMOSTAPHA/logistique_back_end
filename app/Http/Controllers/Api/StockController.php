@@ -14,6 +14,7 @@ use App\Http\Requests\Stock\StoreStockRequest;
 use App\Http\Requests\Stock\UpdateStockRequest;
 use App\Enums\MessageKey;
 use App\Http\Resources\Stock\OldVinInStockResource;
+use App\Models\Stock;
 use App\Services\Stock\StockService;
 use App\Traits\ApiResponsable;
 use Illuminate\Http\JsonResponse;
@@ -71,6 +72,21 @@ class StockController extends Controller
     }
 
     /**
+     * Traçabilité dépôts : Usine → affectations successives.
+     * GET /api/stock/{stock}/depot-historique
+     */
+    public function depotHistorique(Stock $stock): JsonResponse
+    {
+        try {
+            $data = $this->stockService->depotHistoriqueTimeline($stock);
+
+            return $this->success($data, MessageKey::FETCHED);
+        } catch (\Exception $e) {
+            return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
+        }
+    }
+
+    /**
      * Mettre à jour un véhicule en stock.
      * PUT /api/stocks/{id}
      */
@@ -119,7 +135,7 @@ class StockController extends Controller
     public function bulkChangeDepot(BulkChangeDepotStockRequest $request): JsonResponse
     {
         try {
-            $updated = $this->stockService->bulkChangeDepot($request->validated(), Auth::id());
+            $updated = $this->stockService->bulkChangeDepot($request->validated());
 
             return $this->success(['updated' => $updated], MessageKey::UPDATED);
         } catch (\Exception $e) {

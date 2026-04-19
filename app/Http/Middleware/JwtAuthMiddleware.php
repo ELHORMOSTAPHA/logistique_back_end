@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Traits\ApiResponsable;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
 class JwtAuthMiddleware
@@ -37,7 +38,9 @@ class JwtAuthMiddleware
             }
             //merge profile id into request
             $request->merge(['user' => $user]);
-            $request->setUserResolver(fn() => $user);
+            $request->setUserResolver(fn () => $user);
+            // So `auth()->id()`, `Auth::id()`, policies, etc. see the same user as `$request->user()`.
+            Auth::guard(config('auth.defaults.guard'))->setUser($user);
 
             return $next($request);
         } catch (\Exception $e) {

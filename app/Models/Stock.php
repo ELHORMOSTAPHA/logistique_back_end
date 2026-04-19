@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\RecordsDeletedBy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Stock extends Model
@@ -42,6 +43,8 @@ class Stock extends Model
         'statut',//etat d'avancement de la livraison
         'created_by',
         'deleted_by',
+        //combinaison rare
+        'combinaison_rare',
         'deleted_at',
         'updated_by',
     ];
@@ -49,12 +52,19 @@ class Stock extends Model
     protected $casts = [
         'reserved' => 'boolean',
         'expose'   => 'integer',
+        'combinaison_rare' => 'boolean',
     ];
 
     // Relations
     public function depot(): BelongsTo
     {
         return $this->belongsTo(Depot::class);
+    }
+
+    /** Passages du véhicule par les dépôts (traçabilité). */
+    public function depotHistoriques(): HasMany
+    {
+        return $this->hasMany(DepotHistorique::class);
     }
     public function stockStatus(): BelongsTo
     {

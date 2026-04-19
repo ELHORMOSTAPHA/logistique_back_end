@@ -2,6 +2,7 @@
 
 namespace App\Services\Stock;
 
+use App\Models\DepotHistorique;
 use App\Models\Stock;
 use App\Support\PaginationPayload;
 use App\Support\QueryFilterNormalizer;
@@ -16,6 +17,29 @@ class StockService
 {
     /** Dépôt par défaut pour l'import « Alimenter stock » (ligne sans `depot_id` exploitable). */
     private const DEFAULT_STOCK_FEED_DEPOT_ID = 1;
+
+    /**
+     * Trace un passage du véhicule dans un dépôt lorsque `depot_id` change (ou première affectation).
+     */
+    private function recordStockDepotHistorique(int $stockId, ?int $previousDepotId, ?int $newDepotId, ?int $userId): void
+    {
+        if ($newDepotId === null || $newDepotId < 1) {
+            return;
+        }
+        if ($previousDepotId !== null && (int) $previousDepotId === (int) $newDepotId) {
+            return;
+        }
+
+        // Insertion SQL explicite : heure réelle (évite toute troncature côté cast).
+        // La colonne doit être DATETIME (migration 2026_04_19_120000) — si elle reste en DATE, MySQL ne garde que le jour → 00:00:00.
+        // Fuseau : `config('app.timezone')` / APP_TIMEZONE (ex. Africa/Casablanca pour le Maroc).
+        DB::table('depot_historiques')->insert([
+            'stock_id' => $stockId,
+            'depot_id' => $newDepotId,
+            'created_by' => $userId,
+            'created_at' => now()->format('Y-m-d H:i:s'),
+        ]);
+    }
 
     /**
      * @param  array<string, mixed>  $query  Validated index / query parameters
@@ -113,11 +137,13 @@ class StockService
 
     /**
      * Change le dépôt pour plusieurs stocks (même dépôt pour tous).
+     * L’utilisateur authentifié sert pour `updated_by` et la traçabilité `depot_historiques`.
      *
      * @param  array<string, mixed>  $data  Payload validé {@see BulkChangeDepotStockRequest}
      */
-    public function bulkChangeDepot(array $data, ?int $userId): int
+    public function bulkChangeDepot(array $data): int
     {
+        $userId = auth()->id();
         $depotId = (int) ($data['depot_id'] ?? 0);
 
         if (! empty($data['select_all'])) {
@@ -129,10 +155,21 @@ class StockService
                 $queryBuilder->whereNotIn('id', array_map('intval', $data['excluded_ids']));
             }
 
-            return $queryBuilder->update([
+            $stocks = (clone $queryBuilder)->get(['id', 'depot_id']);
+            $count = $queryBuilder->update([
                 'depot_id' => $depotId,
                 'updated_by' => $userId,
             ]);
+            foreach ($stocks as $stock) {
+                $this->recordStockDepotHistorique(
+                    (int) $stock->id,
+                    $stock->depot_id !== null ? (int) $stock->depot_id : null,
+                    $depotId,
+                    $userId,
+                );
+            }
+
+            return $count;
         }
 
         $ids = array_map('intval', $data['ids'] ?? []);
@@ -140,10 +177,21 @@ class StockService
             return 0;
         }
 
-        return Stock::query()->whereIn('id', $ids)->update([
+        $stocks = Stock::query()->whereIn('id', $ids)->get(['id', 'depot_id']);
+        $count = Stock::query()->whereIn('id', $ids)->update([
             'depot_id' => $depotId,
             'updated_by' => $userId,
         ]);
+        foreach ($stocks as $stock) {
+            $this->recordStockDepotHistorique(
+                (int) $stock->id,
+                $stock->depot_id !== null ? (int) $stock->depot_id : null,
+                $depotId,
+                $userId,
+            );
+        }
+
+        return $count;
     }
 
     /**
@@ -315,6 +363,9 @@ class StockService
             $attributes = $this->stockCreateAttributes($data);
             $attributes['created_by'] = $userId;
             $stock = Stock::query()->create($attributes);
+            if (isset($attributes['depot_id']) && (int) $attributes['depot_id'] > 0) {
+                $this->recordStockDepotHistorique((int) $stock->id, null, (int) $attributes['depot_id'], $userId);
+            }
             $stock->load(['depot', 'lot']);
             return $stock;
         } catch (\Exception $e) {
@@ -337,9 +388,17 @@ class StockService
     {
         try {
             $stock = Stock::findOrFail($id);
+            $previousDepotId = $stock->depot_id;
             $payload = $this->stockUpdateAttributes($validated);
+            if ($payload !== [] && $userId !== null) {
+                $payload['updated_by'] = $userId;
+            }
             if ($payload !== []) {
                 $stock->update($payload);
+            }
+            if (array_key_exists('depot_id', $payload)) {
+                $newDepotId = $payload['depot_id'] !== null ? (int) $payload['depot_id'] : null;
+                $this->recordStockDepotHistorique((int) $stock->id, $previousDepotId !== null ? (int) $previousDepotId : null, $newDepotId, $userId);
             }
             return $stock;
         } catch (\Exception $e) {
@@ -369,10 +428,19 @@ class StockService
             return null;
         }
 
+        $previousDepotId = $stock->depot_id;
+        $newDepotId = (int) $data['depot_id'];
+
         $stock->update([
-            'depot_id' => (int) $data['depot_id'],
+            'depot_id' => $newDepotId,
             'updated_by' => $userId,
         ]);
+        $this->recordStockDepotHistorique(
+            (int) $stock->id,
+            $previousDepotId !== null ? (int) $previousDepotId : null,
+            $newDepotId,
+            $userId,
+        );
         $stock->load(['depot', 'lot']);
 
         return $stock;
@@ -431,8 +499,7 @@ class StockService
                 try {
                     DB::transaction(function () use ($row, $userId, &$created) {
                         $attrs = $this->stockAttributesFromImportRow($row);
-                        Stock::query()->create(array_merge($attrs, [
-                            'depot_id' => $this->resolveDepotIdForStockFeedRow($row),
+                        $stock = Stock::query()->create(array_merge($attrs, [
                             'created_by' => $userId,
                             'updated_by' => $userId,
                         ]));
@@ -549,16 +616,33 @@ class StockService
     private function stockUpdateAttributes(array $data): array
     {
         $map = [
-            'modele'         => 'modele',
-            'version'        => 'finition',
-            'vin'            => 'vin',
-            'color_ex'       => 'color_ex',
-            'color_ex_code'  => 'color_ex_code',
-            'color_int'      => 'color_int',
-            'color_int_code' => 'color_int_code',
-            'reserved'       => 'reserved',
-            'depot_id'       => 'depot_id',
-            'lot_id'         => 'lot_id',
+            'marque'                   => 'marque',
+            'numero_commande'          => 'numero_commande',
+            'modele'                   => 'modele',
+            'version'                  => 'finition',
+            'finition'                 => 'finition',
+            'vin'                      => 'vin',
+            'color_ex'                 => 'color_ex',
+            'color_ex_code'            => 'color_ex_code',
+            'color_int'                => 'color_int',
+            'color_int_code'           => 'color_int_code',
+            'client'                   => 'client',
+            'type_client'              => 'type_client',
+            'PGEO'                     => 'PGEO',
+            'options'                  => 'options',
+            'vendeur'                  => 'vendeur',
+            'site_affecte'             => 'site_affecte',
+            'date_creation_commande'   => 'date_creation_commande',
+            'date_arrivage_prevu'      => 'date_arrivage_prevu',
+            'date_arrivage_reelle'     => 'date_arrivage_reelle',
+            'date_affectation'         => 'date_affectation',
+            'depot_id'                 => 'depot_id',
+            'stock_status_id'          => 'stock_status_id',
+            'statut'                   => 'statut',
+            'numero_lot'               => 'numero_lot',
+            'numero_arrivage'          => 'numero_arrivage',
+            'lot_id'                   => 'lot_id',
+            'combinaison_rare'         => 'combinaison_rare',
         ];
 
         $out = [];
@@ -676,24 +760,6 @@ class StockService
         ];
     }
 
-    /**
-     * Dépôt pour une ligne « Alimenter stock » : défaut {@see DEFAULT_STOCK_FEED_DEPOT_ID},
-     * sauf si la ligne contient un `depot_id` entier strictement positif (futur fichier / API).
-     *
-     * @param  array<string, mixed>  $row
-     */
-    private function resolveDepotIdForStockFeedRow(array $row): int
-    {
-        $raw = $row['depot_id'] ?? null;
-        if ($raw !== null && $raw !== '') {
-            $d = (int) $raw;
-            if ($d > 0) {
-                return $d;
-            }
-        }
-
-        return self::DEFAULT_STOCK_FEED_DEPOT_ID;
-    }
 
     /**
      * Map import keys to DB columns; omit empties. Dates normalized to Y-m-d.
@@ -776,5 +842,61 @@ class StockService
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    /**
+     * Fil chronologique Usine → dépôts pour la traçabilité (UI modal).
+     *
+     * @return array{stock: array<string, mixed>, timeline: array<int, array<string, mixed>>}
+     */
+    public function depotHistoriqueTimeline(Stock $stock): array
+    {
+        $historiques = DepotHistorique::query()
+            ->where('stock_id', $stock->getKey())
+            ->with(['depot', 'creator'])
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->get();
+
+        $timeline = [];
+
+        $timeline[] = [
+            'kind' => 'usine',
+            'title' => 'Usine',
+            'subtitle' => 'Fabrication — avant affectation à un dépôt logistique',
+            'date' => $stock->created_at !== null ? $stock->created_at->toDateString() : null,
+            'at' => $stock->created_at !== null ? $stock->created_at->toIso8601String() : null,
+        ];
+
+        foreach ($historiques as $h) {
+            $creator = $h->creator;
+            $timeline[] = [
+                'kind' => 'depot',
+                'id' => $h->id,
+                'date' => $h->created_at !== null ? $h->created_at->format('Y-m-d') : null,
+                'at' => $h->created_at !== null ? $h->created_at->toIso8601String() : null,
+                'depot' => $h->depot !== null ? [
+                    'id' => $h->depot->id,
+                    'name' => $h->depot->name,
+                    'type' => $h->depot->type,
+                ] : null,
+                'created_by_user' => $creator !== null ? [
+                    'id' => $creator->id,
+                    'nom' => $creator->nom,
+                    'prenom' => $creator->prenom,
+                ] : null,
+            ];
+        }
+
+        return [
+            'stock' => [
+                'id' => $stock->id,
+                'vin' => $stock->vin,
+                'numero_commande' => $stock->numero_commande,
+                'depot_id' => $stock->depot_id,
+                'created_at' => $stock->created_at !== null ? $stock->created_at->toIso8601String() : null,
+            ],
+            'timeline' => $timeline,
+        ];
     }
 }

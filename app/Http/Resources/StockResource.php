@@ -14,8 +14,10 @@ class StockResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'marque' => $this->marque,
             'modele' => $this->modele,
-            'version' => $this->version,
+            /** @deprecated Utiliser `finition` — alias pour anciens clients. */
+            'version' => $this->finition,
             'vin' => $this->vin,
             'numero_commande' => $this->numero_commande,
             'client' => $this->client,
@@ -40,6 +42,7 @@ class StockResource extends JsonResource
             'numero_lot' => $this->numero_lot,
             'numero_arrivage' => $this->numero_arrivage,
             'statut' => $this->statut,
+            'combinaison_rare' => (bool) $this->combinaison_rare,
             'created_by' => $this->created_by,
             'updated_by' => $this->updated_by,
             'deleted_by' => $this->deleted_by,
