@@ -202,17 +202,11 @@ class DemandeReservationService
         // Mark stock reserved
         $stock->update(['reserved' => true]);
 
-        // Update demande
+        // Assign stock to demande (statut unchanged — logistician validates separately)
         $demande->update([
             'stock_id' => $stock->id,
             'vin'      => $stock->vin ?: null,
-            'statut'   => 'accepté',
         ]);
-
-        // Sync to CRM
-        if ($demande->id_demande) {
-            $this->syncOrderStatusToCrm((string) $demande->id_demande, 'validee');
-        }
 
         return $demande->fresh()->load(['stock', 'demandeMotifs']);
     }

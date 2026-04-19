@@ -19,10 +19,6 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-// Route externe — SOUEAST-CRM (protégée par clé API)
-Route::middleware('api.key')->prefix('external')->group(function () {
-    Route::post('/sync-commande', [ExternalSyncController::class, 'syncCommande']);
-});
 
 // Serve public storage files (bypasses php artisan serve symlink limitation)
 Route::get('/files/{path}', function (string $path) {
@@ -83,6 +79,7 @@ Route::middleware('jwt.auth')->group(function () {
 //you should refresh token after 24 h
 // Routes for external integrations (system-to-system)
 Route::prefix('integration')->middleware('integration.auth')->group(function () {
+    Route::post('/sync-commande', [ExternalSyncController::class, 'syncCommande']);
     Route::get('/test', function (Request $request) {
         return response()->json([
             'success' => true,
