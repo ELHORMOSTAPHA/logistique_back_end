@@ -13,6 +13,7 @@ use App\Http\Requests\Stock\IndexStockRequest;
 use App\Http\Requests\Stock\StoreStockRequest;
 use App\Http\Requests\Stock\UpdateStockRequest;
 use App\Enums\MessageKey;
+use App\Http\Resources\Stock\OldVinInStockResource;
 use App\Services\Stock\StockService;
 use App\Traits\ApiResponsable;
 use Illuminate\Http\JsonResponse;
@@ -33,7 +34,7 @@ class StockController extends Controller
     public function index(IndexStockRequest $request): JsonResponse
     {
         try {
-        $stocks = $this->stockService->list($request->validated());
+            $stocks = $this->stockService->list($request->validated());
             return $this->success($stocks, MessageKey::FETCHED);
         } catch (\Exception $e) {
             return $this->error(MessageKey::SERVER, $e->getMessage());
@@ -182,6 +183,21 @@ class StockController extends Controller
         try {
             $result = $this->stockService->listStockAproximit($request->validated());
             return $this->success($result, MessageKey::FETCHED);
+        } catch (\Exception $e) {
+            return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
+        }
+    }
+
+    public function getOldVinInStock(listStockAproximit $request): JsonResponse
+    {
+        try {
+            $result = $this->stockService->getOldVinInStock($request->validated());
+
+            if ($result === null) {
+                return response()->json(['message' => 'Aucun véhicule correspondant trouvé.'], 404);
+            }
+
+            return $this->success(new OldVinInStockResource($result), MessageKey::FETCHED);
         } catch (\Exception $e) {
             return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
         }

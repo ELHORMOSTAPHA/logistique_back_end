@@ -2,6 +2,7 @@
 
 use App\Exceptions\Handler as AppExceptionHandler;
 use App\Http\Middleware\IntegrationAuthMiddleware;
+use App\Http\Middleware\ApiKeyMiddleware;
 use App\Http\Middleware\JwtAuthMiddleware;
 use App\Http\Middleware\SetLocaleMiddleware;
 use Illuminate\Contracts\Debug\ExceptionHandler;
@@ -21,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'jwt.auth' => JwtAuthMiddleware::class,
             'integration.auth' => IntegrationAuthMiddleware::class,
+            'api.key'  => ApiKeyMiddleware::class,
         ]);
         $middleware->api(append: [
             SetLocaleMiddleware::class,

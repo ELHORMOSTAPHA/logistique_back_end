@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ExternalSyncController;
 use App\Http\Controllers\Api\DemandeReservationController;
 use App\Http\Controllers\Api\DepotController;
 use App\Http\Controllers\Api\HistoriqueController;
@@ -17,6 +18,14 @@ use Illuminate\Support\Facades\Route;
 | API Routes - MoLogistic
 |--------------------------------------------------------------------------
 */
+
+
+// Serve public storage files (bypasses php artisan serve symlink limitation)
+Route::get('/files/{path}', function (string $path) {
+    $fullPath = storage_path('app/public/' . $path);
+    abort_if(! file_exists($fullPath), 404);
+    return response()->file($fullPath);
+})->where('path', '.*');
 
 // Routes publiques (sans authentification)
 Route::prefix('auth')->group(function () {
@@ -46,6 +55,10 @@ Route::middleware('jwt.auth')->group(function () {
     Route::apiResource('historique', HistoriqueController::class);
     //demande_reservation
     Route::apiResource('demande_reservation', DemandeReservationController::class);
+    Route::get('demande_reservation/{demande_reservation}/matching-stock',  [DemandeReservationController::class, 'matchingStock']);
+    Route::post('demande_reservation/{demande_reservation}/affecter-vin',   [DemandeReservationController::class, 'affecterVin']);
+    Route::get('demande_reservation/{demande_reservation}/matching-vin',    [DemandeReservationController::class, 'matchingVin']);
+    Route::post('demande_reservation/{demande_reservation}/modifier-vin',   [DemandeReservationController::class, 'modifierVin']);
     //utilisateur — routes dédiées avant apiResource (sinon "bulk-update-status" est pris pour un id)
     Route::post('utilisateur/bulk-update-status', [UtilisateurController::class, 'bulkUpdateStatus']);
     Route::apiResource('utilisateur', UtilisateurController::class);
@@ -54,9 +67,10 @@ Route::middleware('jwt.auth')->group(function () {
     Route::get('profile/{profile}/permissions', [ProfileController::class, 'permissions']);
     Route::put('profile/{profile}/permissions', [ProfileController::class, 'updatePermissions']);
     Route::apiResource('profile', ProfileController::class);
-  
+
 });
-//to get brearer token lance this commande first #  php artisan integration:client:create "crm_exeedd" --scopes=integration.test --ttl=3600
+//to get brearer token lance this commande first
+#  php artisan integration:client:create "crm_exeedd" --scopes=integration.test --ttl=3600
 //then make request to this url http://localhost:8000/api/integration/token with the following headers:
 //Authorization: Bearer <INTEGRATION_API_TOKEN>
 //Content-Type: application/json
@@ -68,6 +82,7 @@ Route::middleware('jwt.auth')->group(function () {
 //you should refresh token after 24 h
 // Routes for external integrations (system-to-system)
 Route::prefix('integration')->middleware('integration.auth')->group(function () {
+    Route::post('/sync-commande', [ExternalSyncController::class, 'syncCommande']);
     Route::get('/test', function (Request $request) {
         return response()->json([
             'success' => true,
@@ -78,13 +93,15 @@ Route::prefix('integration')->middleware('integration.auth')->group(function () 
                     'client_id' => optional($request->attributes->get('integration_client'))->client_id,
                 ],
                 'client_ip' => $request->ip(),
-                'timestamp' => now()->toISOString(),
+                'timestamp' => \Carbon\Carbon::now()->toISOString(),
             ],
         ]);
     });
     //stock
-   Route::prefix('stock')->group(function () {
-    //list stock aproximit
-    Route::get('/', [StockController::class, 'listStockAproximit']);
-   });
+    Route::prefix('stock')->group(function () {
+        //list stock aproximit
+        Route::get('/', [StockController::class, 'listStockAproximit']);
+        // recherche ancien VIN (ou placeholder sans VIN) par identité véhicule
+        Route::get('/old-vin', [StockController::class, 'getOldVinInStock']);
+    });
 });

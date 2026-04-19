@@ -7,11 +7,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\DemandeReservation\IndexDemandeReservationRequest;
 use App\Http\Requests\DemandeReservation\StoreDemandeReservationRequest;
 use App\Http\Requests\DemandeReservation\UpdateDemandeReservationRequest;
+use App\Http\Requests\DemandeReservation\AffecterVinRequest;
+use App\Http\Resources\DemandeReservationResource;
 use App\Models\DemandeReservation;
 use App\Services\DemandeReservation\DemandeReservationService;
 use App\Traits\ApiResponsable;
 use Illuminate\Http\JsonResponse;
-use App\Http\Resources\DemandeReservationResource;
+use Illuminate\Support\Collection;
 
 
 class DemandeReservationController extends Controller
@@ -77,5 +79,51 @@ class DemandeReservationController extends Controller
         }
 
         return $this->success(null, MessageKey::DELETED);
+    }
+
+    public function matchingStock(DemandeReservation $demande_reservation): JsonResponse
+    {
+        try {
+            $stocks = $this->demandeReservationService->getMatchingStock($demande_reservation);
+            return $this->success($stocks, MessageKey::FETCHED);
+        } catch (\Exception $e) {
+            return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
+        }
+    }
+
+    public function affecterVin(AffecterVinRequest $request, DemandeReservation $demande_reservation): JsonResponse
+    {
+        try {
+            $updated = $this->demandeReservationService->affecterVin($demande_reservation, $request->validated());
+            if (! $updated) {
+                return $this->error(MessageKey::NOT_FOUND, null, 404);
+            }
+            return $this->success($updated, MessageKey::UPDATED);
+        } catch (\Exception $e) {
+            return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
+        }
+    }
+
+    public function matchingVin(DemandeReservation $demande_reservation): JsonResponse
+    {
+        try {
+            $stocks = $this->demandeReservationService->getMatchingVinStock($demande_reservation);
+            return $this->success($stocks, MessageKey::FETCHED);
+        } catch (\Exception $e) {
+            return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
+        }
+    }
+
+    public function modifierVin(AffecterVinRequest $request, DemandeReservation $demande_reservation): JsonResponse
+    {
+        try {
+            $updated = $this->demandeReservationService->modifierVin($demande_reservation, $request->validated());
+            if (! $updated) {
+                return $this->error(MessageKey::NOT_FOUND, null, 404);
+            }
+            return $this->success($updated, MessageKey::UPDATED);
+        } catch (\Exception $e) {
+            return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
+        }
     }
 }

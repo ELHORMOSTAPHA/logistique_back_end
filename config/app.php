@@ -135,4 +135,7 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    'crm_api_key' => env('CRM_API_KEY', ''),
+    'crm_url'     => env('CRM_URL', 'http://localhost/SOUEAST-CRM'),
+
 ];
