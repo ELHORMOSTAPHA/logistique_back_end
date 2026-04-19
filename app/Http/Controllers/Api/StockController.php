@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Stock\BulkAssignLotStockRequest;
+use App\Http\Requests\Stock\BulkChangeDepotStockRequest;
 use App\Http\Requests\Stock\ChangeDepotStockRequest;
 use App\Http\Requests\Stock\ImportStockRequest;
 use App\Http\Requests\Stock\PreviewVinUpdateRequest;
@@ -92,6 +94,36 @@ class StockController extends Controller
         }
 
         return response()->json(['message' => 'Véhicule supprimé du stock.']);
+    }
+
+    /**
+     * Attribuer le même n° de lot (saisie manuelle) à plusieurs stocks.
+     * POST /api/stock/bulk-assign-lot
+     */
+    public function bulkAssignLot(BulkAssignLotStockRequest $request): JsonResponse
+    {
+        try {
+            $updated = $this->stockService->bulkAssignNumeroLot($request->validated(), Auth::id());
+
+            return $this->success(['updated' => $updated], MessageKey::UPDATED);
+        } catch (\Exception $e) {
+            return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Changer le dépôt pour plusieurs stocks (liste déroulante).
+     * POST /api/stock/bulk-change-depot
+     */
+    public function bulkChangeDepot(BulkChangeDepotStockRequest $request): JsonResponse
+    {
+        try {
+            $updated = $this->stockService->bulkChangeDepot($request->validated(), Auth::id());
+
+            return $this->success(['updated' => $updated], MessageKey::UPDATED);
+        } catch (\Exception $e) {
+            return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
+        }
     }
 
     /**

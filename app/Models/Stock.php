@@ -67,6 +67,7 @@ class Stock extends Model
     //queries builder
     /**
      * Global keyword search across stock columns and related depot / lot fields (API `name` param).
+     * Inclut le n° de lot (`numero_lot`).
      */
     public function scopeFilterByName($query, string $name)
     {
@@ -82,6 +83,7 @@ class Stock extends Model
                 ->orWhere('finition', 'like', $like)
                 ->orWhere('vin', 'like', $like)
                 ->orWhere('numero_commande', 'like', $like)
+                ->orWhere('numero_lot', 'like', $like)
                 ->orWhere('color_ex', 'like', $like)
                 ->orWhere('color_ex_code', 'like', $like)
                 ->orWhere('color_int', 'like', $like)

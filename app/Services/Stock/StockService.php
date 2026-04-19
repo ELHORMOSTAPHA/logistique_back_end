@@ -6,6 +6,7 @@ use App\Models\Stock;
 use App\Support\PaginationPayload;
 use App\Support\QueryFilterNormalizer;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +14,9 @@ use Illuminate\Support\Str;
 
 class StockService
 {
+    /** Dépôt par défaut pour l'import « Alimenter stock » (ligne sans `depot_id` exploitable). */
+    private const DEFAULT_STOCK_FEED_DEPOT_ID = 1;
+
     /**
      * @param  array<string, mixed>  $query  Validated index / query parameters
      * @return array<string, mixed>|Collection<int, Stock>
@@ -21,7 +25,28 @@ class StockService
     {
         $f = QueryFilterNormalizer::stock($query);
         $queryBuilder = Stock::query()->with(['depot', 'stockStatus']);
+        $this->applyStockListFilters($queryBuilder, $f);
+        $allowedSort = ['created_at', 'modele', 'vin', 'id'];
+        $sortBy = in_array($f['sort_by'], $allowedSort, true) ? $f['sort_by'] : 'created_at';
+        $order = in_array($f['sort_order'], ['asc', 'desc'], true) ? $f['sort_order'] : 'desc';
+        $queryBuilder->orderBy($sortBy, $order);
 
+        if ($f['paginated'] === false) {
+            return $queryBuilder->get();
+        }
+
+        $pagination = $queryBuilder->paginate($f['per_page'], ['*'], 'page', $f['page'] ?? 1);
+
+        return PaginationPayload::fromPaginator($pagination);
+    }
+
+    /**
+     * Filtres identiques à la liste stock (sans tri / pagination).
+     *
+     * @param  array<string, mixed>  $f  Sortie de {@see QueryFilterNormalizer::stock()}
+     */
+    private function applyStockListFilters(Builder $queryBuilder, array $f): void
+    {
         if ($f['name'] !== null) {
             $queryBuilder->filterByName($f['name']);
         }
@@ -43,18 +68,82 @@ class StockService
         if ($f['lot_id'] !== null) {
             $queryBuilder->filterByLotId($f['lot_id']);
         }
-        $allowedSort = ['created_at', 'modele', 'vin', 'id'];
-        $sortBy = in_array($f['sort_by'], $allowedSort, true) ? $f['sort_by'] : 'created_at';
-        $order = in_array($f['sort_order'], ['asc', 'desc'], true) ? $f['sort_order'] : 'desc';
-        $queryBuilder->orderBy($sortBy, $order);
+    }
 
-        if ($f['paginated'] === false) {
-            return $queryBuilder->get();
+    /**
+     * Met à jour le n° de lot sur les stocks sélectionnés (saisie manuelle, même valeur pour tous).
+     * Chaîne vide ou null efface le n° de lot.
+     *
+     * @param  array<string, mixed>  $data  Payload validé {@see BulkAssignLotStockRequest}
+     */
+    public function bulkAssignNumeroLot(array $data, ?int $userId): int
+    {
+        $raw = $data['numero_lot'] ?? null;
+        $numeroLot = null;
+        if (is_string($raw)) {
+            $t = trim($raw);
+            $numeroLot = $t === '' ? null : mb_substr($t, 0, 45);
         }
 
-        $pagination = $queryBuilder->paginate($f['per_page'], ['*'], 'page', $f['page'] ?? 1);
+        if (! empty($data['select_all'])) {
+            $filters = is_array($data['filters'] ?? null) ? $data['filters'] : [];
+            $f = QueryFilterNormalizer::stock($filters);
+            $queryBuilder = Stock::query();
+            $this->applyStockListFilters($queryBuilder, $f);
+            if (! empty($data['excluded_ids']) && is_array($data['excluded_ids'])) {
+                $queryBuilder->whereNotIn('id', array_map('intval', $data['excluded_ids']));
+            }
 
-        return PaginationPayload::fromPaginator($pagination);
+            return $queryBuilder->update([
+                'numero_lot' => $numeroLot,
+                'updated_by' => $userId,
+            ]);
+        }
+
+        $ids = array_map('intval', $data['ids'] ?? []);
+        if ($ids === []) {
+            return 0;
+        }
+
+        return Stock::query()->whereIn('id', $ids)->update([
+            'numero_lot' => $numeroLot,
+            'updated_by' => $userId,
+        ]);
+    }
+
+    /**
+     * Change le dépôt pour plusieurs stocks (même dépôt pour tous).
+     *
+     * @param  array<string, mixed>  $data  Payload validé {@see BulkChangeDepotStockRequest}
+     */
+    public function bulkChangeDepot(array $data, ?int $userId): int
+    {
+        $depotId = (int) ($data['depot_id'] ?? 0);
+
+        if (! empty($data['select_all'])) {
+            $filters = is_array($data['filters'] ?? null) ? $data['filters'] : [];
+            $f = QueryFilterNormalizer::stock($filters);
+            $queryBuilder = Stock::query();
+            $this->applyStockListFilters($queryBuilder, $f);
+            if (! empty($data['excluded_ids']) && is_array($data['excluded_ids'])) {
+                $queryBuilder->whereNotIn('id', array_map('intval', $data['excluded_ids']));
+            }
+
+            return $queryBuilder->update([
+                'depot_id' => $depotId,
+                'updated_by' => $userId,
+            ]);
+        }
+
+        $ids = array_map('intval', $data['ids'] ?? []);
+        if ($ids === []) {
+            return 0;
+        }
+
+        return Stock::query()->whereIn('id', $ids)->update([
+            'depot_id' => $depotId,
+            'updated_by' => $userId,
+        ]);
     }
 
     /**
@@ -289,6 +378,7 @@ class StockService
                     DB::transaction(function () use ($row, $userId, &$created) {
                         $attrs = $this->stockAttributesFromImportRow($row);
                         Stock::query()->create(array_merge($attrs, [
+                            'depot_id' => $this->resolveDepotIdForStockFeedRow($row),
                             'created_by' => $userId,
                             'updated_by' => $userId,
                         ]));
@@ -477,6 +567,25 @@ class StockService
             'matched' => $matched,
             'unmatched' => $unmatched,
         ];
+    }
+
+    /**
+     * Dépôt pour une ligne « Alimenter stock » : défaut {@see DEFAULT_STOCK_FEED_DEPOT_ID},
+     * sauf si la ligne contient un `depot_id` entier strictement positif (futur fichier / API).
+     *
+     * @param  array<string, mixed>  $row
+     */
+    private function resolveDepotIdForStockFeedRow(array $row): int
+    {
+        $raw = $row['depot_id'] ?? null;
+        if ($raw !== null && $raw !== '') {
+            $d = (int) $raw;
+            if ($d > 0) {
+                return $d;
+            }
+        }
+
+        return self::DEFAULT_STOCK_FEED_DEPOT_ID;
     }
 
     /**

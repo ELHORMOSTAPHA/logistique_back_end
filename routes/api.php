@@ -38,6 +38,8 @@ Route::middleware('jwt.auth')->group(function () {
     Route::post('stock/import-stock', [StockController::class, 'importStock']);
     Route::post('stock/import', [StockController::class, 'importStock']);
     Route::post('stock/preview-vin-update', [StockController::class, 'previewVinUpdate']);
+    Route::post('stock/bulk-assign-lot', [StockController::class, 'bulkAssignLot']);
+    Route::post('stock/bulk-change-depot', [StockController::class, 'bulkChangeDepot']);
     //depot
     Route::apiResource('depot', DepotController::class);
     //historique
