@@ -22,7 +22,7 @@ class JwtAuthMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
-       $token = $request->bearerToken();
+        $token = $request->bearerToken();
 
         if (! $token) {
             return $this->error(MessageKey::AUTH_TOKEN_MISSING, null, 401);
@@ -38,9 +38,8 @@ class JwtAuthMiddleware
             }
             //merge profile id into request
             $request->merge(['user' => $user]);
-            $request->setUserResolver(fn () => $user);
-            // So `auth()->id()`, `Auth::id()`, policies, etc. see the same user as `$request->user()`.
-            Auth::guard(config('auth.defaults.guard'))->setUser($user);
+            $request->setUserResolver(fn() => $user);
+            Auth::setUser($user);
 
             return $next($request);
         } catch (\Exception $e) {

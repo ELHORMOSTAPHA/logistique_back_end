@@ -46,4 +46,9 @@ class DemandeReservation extends Model
     {
         return $this->hasMany(DemandeChangementVin::class, 'demandes_reservation_id');
     }
+
+    public function demandeModificationVins(): HasMany
+    {
+        return $this->hasMany(DemandeModificationVin::class, 'demandes_reservation_id');
+    }
 }
