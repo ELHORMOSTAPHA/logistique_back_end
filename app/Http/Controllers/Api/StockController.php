@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Stock\BulkAssignLotStockRequest;
 use App\Http\Requests\Stock\BulkChangeDepotStockRequest;
+use App\Http\Requests\Stock\BulkChangeStockStatusRequest;
 use App\Http\Requests\Stock\ChangeDepotStockRequest;
 use App\Http\Requests\Stock\ImportStockRequest;
 use App\Http\Requests\Stock\PreviewVinUpdateRequest;
@@ -136,6 +137,21 @@ class StockController extends Controller
     {
         try {
             $updated = $this->stockService->bulkChangeDepot($request->validated());
+
+            return $this->success(['updated' => $updated], MessageKey::UPDATED);
+        } catch (\Exception $e) {
+            return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Appliquer le même statut stock à plusieurs véhicules.
+     * POST /api/stock/bulk-change-stock-status
+     */
+    public function bulkChangeStockStatus(BulkChangeStockStatusRequest $request): JsonResponse
+    {
+        try {
+            $updated = $this->stockService->bulkChangeStockStatus($request->validated());
 
             return $this->success(['updated' => $updated], MessageKey::UPDATED);
         } catch (\Exception $e) {

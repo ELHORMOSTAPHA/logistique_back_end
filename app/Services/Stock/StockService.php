@@ -141,6 +141,43 @@ class StockService
      *
      * @param  array<string, mixed>  $data  Payload validé {@see BulkChangeDepotStockRequest}
      */
+
+    /**
+     * Applique le même statut stock à plusieurs stocks.
+     *
+     * @param  array<string, mixed>  $data  Payload validé {@see BulkChangeStockStatusRequest}
+     */
+    public function bulkChangeStockStatus(array $data): int
+    {
+        $userId = auth()->id();
+        $stockStatusId = (int) ($data['stock_status_id'] ?? 0);
+
+        if (! empty($data['select_all'])) {
+            $filters = is_array($data['filters'] ?? null) ? $data['filters'] : [];
+            $f = QueryFilterNormalizer::stock($filters);
+            $queryBuilder = Stock::query();
+            $this->applyStockListFilters($queryBuilder, $f);
+            if (! empty($data['excluded_ids']) && is_array($data['excluded_ids'])) {
+                $queryBuilder->whereNotIn('id', array_map('intval', $data['excluded_ids']));
+            }
+
+            return $queryBuilder->update([
+                'stock_status_id' => $stockStatusId,
+                'updated_by' => $userId,
+            ]);
+        }
+
+        $ids = array_map('intval', $data['ids'] ?? []);
+        if ($ids === []) {
+            return 0;
+        }
+
+        return Stock::query()->whereIn('id', $ids)->update([
+            'stock_status_id' => $stockStatusId,
+            'updated_by' => $userId,
+        ]);
+    }
+
     public function bulkChangeDepot(array $data): int
     {
         $userId = auth()->id();
@@ -900,3 +937,4 @@ class StockService
         ];
     }
 }
+
