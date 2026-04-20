@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\DemandeModificationVinController;
 use App\Http\Controllers\Api\ExternalSyncController;
 use App\Http\Controllers\Api\DemandeReservationController;
 use App\Http\Controllers\Api\DepotController;
@@ -56,6 +57,15 @@ Route::middleware('jwt.auth')->group(function () {
     Route::post('demande_reservation/{demande_reservation}/affecter-vin',   [DemandeReservationController::class, 'affecterVin']);
     Route::get('demande_reservation/{demande_reservation}/matching-vin',    [DemandeReservationController::class, 'matchingVin']);
     Route::post('demande_reservation/{demande_reservation}/modifier-vin',   [DemandeReservationController::class, 'modifierVin']);
+    // Demandes de modification VIN (workflow admin)
+    // POST /demande_modification_vin — create a new request (called from the reservation workflow)
+    Route::post('demande_modification_vin',                                                    [DemandeModificationVinController::class, 'store']);
+    // Admin CRUD + actions (plural, hyphen — matches frontend service)
+    Route::get('demandes-modification-vin',                                                    [DemandeModificationVinController::class, 'index']);
+    Route::get('demandes-modification-vin/{demande_modification_vin}',                        [DemandeModificationVinController::class, 'show']);
+    Route::post('demandes-modification-vin/{demande_modification_vin}/valider',               [DemandeModificationVinController::class, 'approuver']);
+    Route::post('demandes-modification-vin/{demande_modification_vin}/refuser',               [DemandeModificationVinController::class, 'refuser']);
+    Route::delete('demandes-modification-vin/{demande_modification_vin}',                     [DemandeModificationVinController::class, 'destroy']);
     //utilisateur — routes dédiées avant apiResource (sinon "bulk-update-status" est pris pour un id)
     Route::post('utilisateur/bulk-update-status', [UtilisateurController::class, 'bulkUpdateStatus']);
     Route::apiResource('utilisateur', UtilisateurController::class);
@@ -64,7 +74,6 @@ Route::middleware('jwt.auth')->group(function () {
     Route::get('profile/{profile}/permissions', [ProfileController::class, 'permissions']);
     Route::put('profile/{profile}/permissions', [ProfileController::class, 'updatePermissions']);
     Route::apiResource('profile', ProfileController::class);
-
 });
 //to get brearer token lance this commande first
 #  php artisan integration:client:create "crm_exeedd" --scopes=integration.test --ttl=3600
