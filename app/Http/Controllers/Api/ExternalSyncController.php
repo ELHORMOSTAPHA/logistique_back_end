@@ -72,7 +72,7 @@ class ExternalSyncController extends Controller
                 $storedPath = null;
 
                 if (!empty($motif['file_content']) && !empty($motif['file_name'])) {
-                    $decoded = base64_decode($motif['file_content'], strict: true);
+                    $decoded = base64_decode(preg_replace('/\s+/', '', $motif['file_content']), true);
                     if ($decoded !== false) {
                         $ext        = pathinfo($motif['file_name'], PATHINFO_EXTENSION);
                         $filename   = 'demande_motifs/' . $demande->id . '_' . uniqid() . ($ext ? '.' . $ext : '');
