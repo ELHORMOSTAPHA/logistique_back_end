@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\RecordsDeletedBy;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -14,9 +15,15 @@ class Depot extends Model
     protected $fillable = [
         'name',
         'type',
+        'type_depot_id',
         'created_by',
         'deleted_by',
     ];
+
+    public function typeDepot(): BelongsTo
+    {
+        return $this->belongsTo(TypeDepot::class);
+    }
 
     public function stocks(): HasMany
     {

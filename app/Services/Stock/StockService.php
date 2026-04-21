@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Services\Stock;
 
 use App\Models\DepotHistorique;
@@ -17,6 +16,8 @@ class StockService
 {
     /** Dépôt par défaut pour l'import « Alimenter stock » (ligne sans `depot_id` exploitable). */
     private const DEFAULT_STOCK_FEED_DEPOT_ID = 1;
+    /** Statut par défaut appliqué aux nouvelles lignes de stock. */
+    private const DEFAULT_STOCK_STATUS_ID = 1;
 
     /**
      * Trace un passage du véhicule dans un dépôt lorsque `depot_id` change (ou première affectation).
@@ -599,7 +600,8 @@ class StockService
                         'updated_by' => $userId,
                     ];
                     $lotRaw = isset($row['numero_lot']) ? trim((string) $row['numero_lot']) : '';
-                    if ($lotRaw !== '') {
+                    $currentLot = $target->numero_lot !== null ? trim((string) $target->numero_lot) : '';
+                    if ($lotRaw !== '' && $currentLot === '') {
                         $attrs['numero_lot'] = $lotRaw;
                     }
                     $target->update($attrs);
@@ -769,7 +771,8 @@ class StockService
                 continue;
             }
             $lotRaw = isset($row['numero_lot']) ? trim((string) $row['numero_lot']) : '';
-            $newNumeroLot = $lotRaw !== '' ? $lotRaw : null;
+            $currentLot = $stock->numero_lot !== null ? trim((string) $stock->numero_lot) : '';
+            $newNumeroLot = ($lotRaw !== '' && $currentLot === '') ? $lotRaw : null;
 
             $matched[] = [
                 'line_no' => $lineNo,
@@ -860,6 +863,10 @@ class StockService
             $out[$column] = is_string($val) ? $val : (string) $val;
         }
 
+        $out['stock_status_id'] = isset($row['stock_status_id']) && $row['stock_status_id'] !== null && $row['stock_status_id'] !== ''
+            ? (int) $row['stock_status_id']
+            : self::DEFAULT_STOCK_STATUS_ID;
+
         return $out;
     }
 
@@ -873,6 +880,29 @@ class StockService
         }
 
         $str = is_string($value) ? trim($value) : (string) $value;
+
+        if (preg_match('/^(\d{4}-\d{2}-\d{2})(?:[Tt\s]|$)/', $str, $m)) {
+            return $m[1];
+        }
+
+        // Dates type import français `jj/mm/aaaa` (Carbon peut les lire en `m/j` selon la locale).
+        if (preg_match('/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/', $str, $m)) {
+            $day = (int) $m[1];
+            $month = (int) $m[2];
+            $year = (int) $m[3];
+            if ($day >= 1 && $day <= 31 && $month >= 1 && $month <= 12) {
+                return sprintf('%04d-%02d-%02d', $year, $month, $day);
+            }
+        }
+
+        if (preg_match('/^(\d{4})[\/.\-](\d{1,2})[\/.\-](\d{1,2})$/', $str, $m)) {
+            $year = (int) $m[1];
+            $month = (int) $m[2];
+            $day = (int) $m[3];
+            if ($day >= 1 && $day <= 31 && $month >= 1 && $month <= 12) {
+                return sprintf('%04d-%02d-%02d', $year, $month, $day);
+            }
+        }
 
         try {
             return Carbon::parse($str)->format('Y-m-d');

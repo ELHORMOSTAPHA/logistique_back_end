@@ -29,7 +29,7 @@ return new class extends Migration
             $table->date('date_creation_commande')->nullable();
             $table->boolean('reserved')->nullable()->default(false);
             $table->foreignId('depot_id')->nullable()->constrained('depots')->nullOnDelete();
-            $table->foreignId('stock_status_id')->nullable()->constrained('stock_statuses')->nullOnDelete();
+            $table->foreignId('stock_status_id')->nullable()->constrained('stock_statuts')->nullOnDelete();
             $table->date('date_arrivage_prevu')->nullable();
             $table->date('date_arrivage_reelle')->nullable();
             $table->date('date_affectation')->nullable();

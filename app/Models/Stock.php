@@ -35,6 +35,7 @@ class Stock extends Model
         'reserved',
         'depot_id',
         'stock_status_id',
+        'etat_avancement',
         'date_arrivage_prevu',//Date prévisionnelle de livraison
         'date_arrivage_reelle',//Date réelle de livraison
         'date_affectation',//Date réelle d'affectation
@@ -53,6 +54,10 @@ class Stock extends Model
         'reserved' => 'boolean',
         'expose'   => 'integer',
         'combinaison_rare' => 'boolean',
+        'date_creation_commande' => 'date:Y-m-d',
+        'date_arrivage_prevu' => 'date:Y-m-d',
+        'date_arrivage_reelle' => 'date:Y-m-d',
+        'date_affectation' => 'date:Y-m-d',
     ];
 
     // Relations

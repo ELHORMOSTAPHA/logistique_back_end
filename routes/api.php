@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\LotController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\StockController;
 use App\Http\Controllers\Api\StockStatusController;
+use App\Http\Controllers\Api\TypeDepotController;
 use App\Http\Controllers\Api\UtilisateurController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -42,11 +43,12 @@ Route::middleware('jwt.auth')->group(function () {
     Route::get('/auth/user', [AuthController::class, 'userDetails']);
     Route::get('/auth/me',   [AuthController::class, 'me']);
     // Stocks — CRUD: GET/POST /api/stocks, GET/PUT/PATCH/DELETE /api/stocks/{stock}
-    // Route::apiResource('stock', StockController::class);
+    Route::apiResource('stock', StockController::class);
     // Route::patch('stocks/{id}/depot', [StockController::class, 'changeDepot'])->whereNumber('id');
     Route::get('stock/{stock}/depot-historique', [StockController::class, 'depotHistorique'])
         ->whereNumber('stock');
     Route::get('stock-statuses', [StockStatusController::class, 'index']);
+    Route::get('type-depots', [TypeDepotController::class, 'index']);
     Route::apiResource('stock', StockController::class);
     // Import JSON rows (client parses .xlsx / .csv / .ods)
     Route::post('stock/import-stock', [StockController::class, 'importStock']);

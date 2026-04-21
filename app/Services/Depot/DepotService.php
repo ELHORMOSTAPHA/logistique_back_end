@@ -3,6 +3,7 @@
 namespace App\Services\Depot;
 
 use App\Models\Depot;
+use App\Models\TypeDepot;
 use App\Support\PaginationPayload;
 use App\Support\QueryFilterNormalizer;
 use Illuminate\Support\Collection;
@@ -16,7 +17,7 @@ class DepotService
     public function list(array $query): array|Collection
     {
         $f = QueryFilterNormalizer::depot($query);
-        $builder = Depot::query();
+        $builder = Depot::query()->with('typeDepot:id,libelle');
 
         if ($f['name'] !== null) {
             $builder->filterByName($f['name']);
@@ -65,7 +66,16 @@ class DepotService
         $attributes = array_filter([
             'name' => $data['name'] ?? null,
             'type' => $data['type'] ?? null,
+            'type_depot_id' => $data['type_depot_id'] ?? null,
         ], static fn ($v) => $v !== null);
+
+        if (array_key_exists('type_depot_id', $attributes)) {
+            $typeDepot = TypeDepot::query()->find($attributes['type_depot_id']);
+            if ($typeDepot) {
+                $attributes['type'] = $typeDepot->libelle;
+            }
+        }
+
         if ($userId !== null) {
             $attributes['created_by'] = (string) $userId;
         }
@@ -92,7 +102,20 @@ class DepotService
         $data = array_filter([
             'name' => $validated['name'] ?? null,
             'type' => $validated['type'] ?? null,
+            'type_depot_id' => $validated['type_depot_id'] ?? null,
         ], static fn ($v) => $v !== null);
+
+        if (array_key_exists('type_depot_id', $validated)) {
+            if ($validated['type_depot_id'] === null) {
+                $data['type_depot_id'] = null;
+                $data['type'] = null;
+            } else {
+                $typeDepot = TypeDepot::query()->find($validated['type_depot_id']);
+                if ($typeDepot) {
+                    $data['type'] = $typeDepot->libelle;
+                }
+            }
+        }
 
         if ($data !== []) {
             $depot->update($data);
