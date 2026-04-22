@@ -67,10 +67,11 @@ class DemandeModificationVinService
      */
     public function create(array $data, ?int $demandeurId): DemandeModificationVin
     {
-        $demande = DemandeReservation::query()->find((int) $data['demandes_reservation_id']);
-        $stock   = Stock::query()->find((int) $data['stock_id']);
+        $demande    = DemandeReservation::query()->with('stock')->find((int) $data['demandes_reservation_id']);
+        $stock      = Stock::query()->find((int) $data['stock_id']);
+        $vinInitial = $demande?->vin ?? $demande?->stock?->vin ?? null;
 
-        if (! $demande || empty($demande->vin)) {
+        if (! $demande || empty($vinInitial)) {
             throw new \InvalidArgumentException('Aucun VIN n\'est actuellement affecté à cette demande.');
         }
 
@@ -82,7 +83,7 @@ class DemandeModificationVinService
             'demandes_reservation_id' => $demande->id,
             'stock_id'                => $stock->id,
             'demandeur_id'            => $demandeurId ?? Auth::id(),
-            'vin_initial'             => (string) $demande->vin,
+            'vin_initial'             => (string) $vinInitial,
             'vin_nouveau'             => (string) $stock->vin,
             'motif'                   => (string) $data['motif'],
             'statut'                  => 'en_attente',

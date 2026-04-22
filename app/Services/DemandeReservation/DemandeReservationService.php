@@ -233,19 +233,23 @@ class DemandeReservationService
         }
 
         $toRow = function (Stock $s) {
+            $entreeDate = $s->entree_stock_date;
             return [
-                'id'            => $s->id,
-                'vin'           => $s->vin,
-                'has_vin'       => true,
-                'in_arrivage'   => false,
-                'marque'        => $s->marque,
-                'modele'        => $s->modele,
-                'finition'      => $s->finition,
-                'color_ex'      => $s->color_ex,
-                'color_int'     => $s->color_int,
-                'reserved'      => (bool) $s->reserved,
-                'stock_age_days' => (int) Carbon::parse($s->created_at)->diffInDays(now()),
-                'created_at'    => $s->created_at,
+                'id'               => $s->id,
+                'vin'              => $s->vin,
+                'has_vin'          => true,
+                'in_arrivage'      => false,
+                'marque'           => $s->marque,
+                'modele'           => $s->modele,
+                'finition'         => $s->finition,
+                'color_ex'         => $s->color_ex,
+                'color_int'        => $s->color_int,
+                'reserved'         => (bool) $s->reserved,
+                'entree_stock_date' => $entreeDate,
+                'stock_age_days'   => $entreeDate
+                    ? (int) Carbon::parse($entreeDate)->diffInDays(now())
+                    : (int) Carbon::parse($s->created_at)->diffInDays(now()),
+                'created_at'       => $s->created_at,
             ];
         };
 
@@ -256,13 +260,10 @@ class DemandeReservationService
             ->where('color_ex',  'like', '%' . $colorEx  . '%')
             ->where('color_int', 'like', '%' . $colorInt . '%')
             ->whereNotNull('vin')->where('vin', '!=', '')
-            ->orderBy('created_at', 'asc')
+            ->where('reserved', false)
+            ->whereHas('depot', fn ($q) => $q->where('type', 'Stockage'))
+            ->orderByRaw('entree_stock_date IS NULL ASC, entree_stock_date ASC')
             ->get();
-
-        // Always include the currently assigned stock even if reserved
-        if ($stock && ! empty($stock->vin) && ! $rows->contains('id', $stock->id)) {
-            $rows = $rows->prepend($stock);
-        }
 
         return $rows->map(function (Stock $s) use ($toRow) {
             return $toRow($s);

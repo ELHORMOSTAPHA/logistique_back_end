@@ -30,6 +30,9 @@ class ExternalSyncController extends Controller
         $data = $request->validate([
             'numero_commande'              => 'required|string|max:45',
             'vin'                          => 'nullable|string|max:45',
+            'id_stock'                     => 'nullable|integer',
+            'expose'                       => 'nullable|boolean',
+            'in_arrivage'                  => 'nullable|boolean',
             'vendeur'                      => 'required|string|max:45',
             'date_commande'                => 'required|date_format:Y-m-d',
             'date_livraison'               => 'required|date_format:Y-m-d',
@@ -48,10 +51,20 @@ class ExternalSyncController extends Controller
             'motifs.*.file_name'           => 'nullable|string|max:255',
         ]);
 
-        // Try to find matching stock by VIN — optional
-        $stock = ! empty($data['vin'])
-            ? Stock::where('vin', $data['vin'])->first()
-            : null;
+        // Find stock: prefer id_stock, fall back to VIN
+        $stock = null;
+        if (! empty($data['id_stock'])) {
+            $stock = Stock::find($data['id_stock']);
+        }
+        if ($stock === null && ! empty($data['vin'])) {
+            $stock = Stock::where('vin', $data['vin'])->first();
+        }
+
+        // Mark stock as reserved when found
+        if ($stock !== null) {
+            $stock->reserved = true;
+            $stock->save();
+        }
 
         // Always create/update the demande regardless of stock match
         $demande = DemandeReservation::updateOrCreate(
