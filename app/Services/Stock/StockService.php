@@ -313,9 +313,8 @@ class StockService
      *
      * @param  array<string, mixed>  $data  Payload validé {@see BulkChangeStockStatusRequest}
      */
-    public function bulkChangeStockStatus(array $data): int
+    public function bulkChangeStockStatus(array $data, ?int $userId): int
     {
-        $userId = auth()->id();
         $stockStatusId = (int) ($data['stock_status_id'] ?? 0);
 
         if (! empty($data['select_all'])) {
@@ -344,10 +343,8 @@ class StockService
         ]);
     }
 
-    
-    public function bulkChangeDepot(array $data): int
+    public function bulkChangeDepot(array $data, ?int $userId): int
     {
-        $userId = auth()->id();
         $depotId = (int) ($data['depot_id'] ?? 0);
         $isShowroomDepot = $this->isShowroomDepot($depotId);
         $isEntreeStockDepot = $this->isEntreeStockDepot($depotId);
@@ -553,12 +550,17 @@ class StockService
             ->where('color_ex', 'like', '%' . $colorEx . '%')
             ->where('color_int', 'like', '%' . $colorInt . '%')
             ->where('reserved', false)
+            ->where(fn($q) => $q->whereNull('expose')->orWhere('expose', '!=', 1))
+            ->whereDoesntHave('depot', fn($q) => $q->whereIn('type', ['showroom', 'quarantaine']))
             ->orderBy('created_at', 'asc');
 
         // Groupe 1 : VIN renseigné
         $stock = $baseQuery()
             ->whereNotNull('vin')
             ->where('vin', '!=', '')
+            ->whereHas('depot', function (Builder $q) {
+                $q->where('type_depot_id', self::ENTREE_STOCK_TYPE_DEPOT_ID);
+            })
             ->first();
 
         if ($stock) {
@@ -570,6 +572,9 @@ class StockService
         $stock = $baseQuery()
             ->where(function ($q) {
                 $q->whereNull('vin')->orWhere('vin', '');
+            })
+            ->whereHas('depot', function (Builder $q) {
+                $q->where('type_depot_id', self::ENTREE_STOCK_TYPE_DEPOT_ID);
             })
             ->first();
 
@@ -819,14 +824,16 @@ class StockService
 
             if ($importMode === 'stock_feed') {
                 $missing = [];
-                foreach ([
-                    'numero_commande' => 'N° cde',
-                    'marque' => 'Marque',
-                    'modele' => 'Modèle',
-                    'finition' => 'Finition',
-                    'color_ex' => 'Couleur Extérieure',
-                    'color_int' => 'Couleur Intérieure',
-                ] as $field => $label) {
+                foreach (
+                    [
+                        'numero_commande' => 'N° cde',
+                        'marque' => 'Marque',
+                        'modele' => 'Modèle',
+                        'finition' => 'Finition',
+                        'color_ex' => 'Couleur Extérieure',
+                        'color_int' => 'Couleur Intérieure',
+                    ] as $field => $label
+                ) {
                     $val = $row[$field] ?? null;
                     if ($val === null || (is_string($val) && trim($val) === '')) {
                         $missing[] = $label;
@@ -867,15 +874,17 @@ class StockService
 
             // import_mode === vin_update : mise à jour du VIN (+ lot optionnel) sur véhicule sans châssis
             $missingVinUpdate = [];
-            foreach ([
-                'vin' => 'N° châssis',
-                'numero_commande' => 'N° cde',
-                'marque' => 'Marque',
-                'modele' => 'Modèle',
-                'finition' => 'Finition',
-                'color_ex' => 'Couleur Extérieure',
-                'color_int' => 'Couleur Intérieure',
-            ] as $field => $label) {
+            foreach (
+                [
+                    'vin' => 'N° châssis',
+                    'numero_commande' => 'N° cde',
+                    'marque' => 'Marque',
+                    'modele' => 'Modèle',
+                    'finition' => 'Finition',
+                    'color_ex' => 'Couleur Extérieure',
+                    'color_int' => 'Couleur Intérieure',
+                ] as $field => $label
+            ) {
                 $val = $row[$field] ?? null;
                 if ($val === null || (is_string($val) && trim($val) === '')) {
                     $missingVinUpdate[] = $label;
@@ -884,14 +893,14 @@ class StockService
 
             if ($missingVinUpdate !== []) {
                 $skipped++;
-                $messages[] = $lineLabel.' — champ(s) obligatoire(s) manquant(s): '.implode(', ', $missingVinUpdate).'.';
+                $messages[] = $lineLabel . ' — champ(s) obligatoire(s) manquant(s): ' . implode(', ', $missingVinUpdate) . '.';
 
                 continue;
             }
 
             if ($this->vinIsAlreadyAssignedToAStock($vinRaw)) {
                 $skipped++;
-                $messages[] = $lineLabel.' — Ce N° châssis est déjà attribué à un autre véhicule.';
+                $messages[] = $lineLabel . ' — Ce N° châssis est déjà attribué à un autre véhicule.';
 
                 continue;
             }
@@ -900,7 +909,7 @@ class StockService
 
             if ($target === null) {
                 $skipped++;
-                $messages[] = $lineLabel.' — Aucun véhicule sans N° châssis ne correspond (commande, marque, modèle, finition, couleurs).';
+                $messages[] = $lineLabel . ' — Aucun véhicule sans N° châssis ne correspond (commande, marque, modèle, finition, couleurs).';
 
                 continue;
             }
@@ -919,7 +928,7 @@ class StockService
                     $target->update($attrs);
                     $updated++;
                 });
-                $updatedDetails[] = $lineLabel.' — Stock #'.$target->getKey().' : N° châssis mis à jour.';
+                $updatedDetails[] = $lineLabel . ' — Stock #' . $target->getKey() . ' : N° châssis mis à jour.';
             } catch (\Throwable $e) {
                 $skipped++;
                 $messages[] = $lineLabel . ' — ' . $e->getMessage();
@@ -1279,4 +1288,3 @@ class StockService
         ];
     }
 }
-
