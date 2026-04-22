@@ -143,15 +143,27 @@ class LivraisonService
         }
 
         return DB::transaction(function () use ($livraison, $data, $userId) {
-            $livraison->update([
+            $updatePayload = [
                 'statut'     => $data['statut'],
                 'updated_by' => $userId,
-            ]);
+            ];
+
+            if ($data['statut'] === 'facturé' && ! empty($data['n_facture'])) {
+                $updatePayload['n_facture'] = $data['n_facture'];
+            }
+
+            if ($data['statut'] === 'livré' && ! empty($data['ww'])) {
+                $updatePayload['ww'] = $data['ww'];
+            }
+
+            $livraison->update($updatePayload);
+
+            $infos = $data['n_facture'] ?? $data['ww'] ?? null;
 
             $historique = LivraisonHistorique::query()->create([
                 'livraison_id' => $livraison->id,
                 'statut'       => $data['statut'],
-                'infos'        => $data['infos'] ?? null,
+                'infos'        => $infos,
                 'created_by'   => $userId,
             ]);
 
