@@ -226,7 +226,11 @@ class StockController extends Controller
             $result = $this->stockService->getOldVinInStock($request->validated());
 
             if ($result === null) {
-                return response()->json(['message' => 'Aucun véhicule correspondant trouvé.'], 404);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Aucun véhicule correspondant trouvé.',
+                    'data' => null
+                ], 404);
             }
 
             return $this->success(new OldVinInStockResource($result), MessageKey::FETCHED);
