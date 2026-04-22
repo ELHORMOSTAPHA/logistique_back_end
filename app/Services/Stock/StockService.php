@@ -471,7 +471,7 @@ class StockService
             ->get()
             ->map(function (Stock $s) {
                 $s->setAttribute('in_arrivage', true);
-                $s->setAttribute('match_type', 'arrival');
+                $s->setAttribute('match_type', 'exact');
                 return $s;
             });
 
@@ -489,13 +489,14 @@ class StockService
             ->where('marque', 'like', '%' . $marque . '%')
             ->where(function ($q) use ($colorEx, $colorInt) {
                 $q->where('color_ex', 'like', '%' . $colorEx . '%')->orWhere('color_int', 'like', '%' . $colorInt . '%');
+                
             })
             ->orderBy('created_at', 'asc')
             ->get()
             ->values()
             ->map(function (Stock $s) {
                 $s->setAttribute('in_arrivage', false);
-                $s->setAttribute('match_type', 'exact');
+                $s->setAttribute('match_type', 'partial');
                 return $s;
             });
 
@@ -552,9 +553,9 @@ class StockService
             ->where('color_ex', 'like', '%' . $colorEx . '%')
             ->where('color_int', 'like', '%' . $colorInt . '%')
             ->where('reserved', false)
-            ->where(fn($q) => $q->whereNull('expose')->orWhere('expose', '!=', 1))
-            ->whereDoesntHave('depot', fn($q) => $q->whereIn('type', ['showroom', 'quarantaine']))
-            ->orderBy('created_at', 'asc');
+            // ->where(fn($q) => $q->whereNull('expose')->orWhere('expose', '!=', 1))
+            // ->whereDoesntHave('depot', fn($q) => $q->whereIn('type', ['showroom', 'quarantaine']))
+            ->orderByRaw('entree_stock_date IS NULL ASC, entree_stock_date ASC');
 
         // Groupe 1 : VIN renseigné
         $stock = $baseQuery()
