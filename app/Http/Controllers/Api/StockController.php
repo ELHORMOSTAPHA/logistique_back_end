@@ -136,7 +136,7 @@ class StockController extends Controller
     public function bulkChangeDepot(BulkChangeDepotStockRequest $request): JsonResponse
     {
         try {
-            $updated = $this->stockService->bulkChangeDepot($request->validated());
+            $updated = $this->stockService->bulkChangeDepot($request->validated(), Auth::id());
 
             return $this->success(['updated' => $updated], MessageKey::UPDATED);
         } catch (\Exception $e) {
@@ -151,7 +151,7 @@ class StockController extends Controller
     public function bulkChangeStockStatus(BulkChangeStockStatusRequest $request): JsonResponse
     {
         try {
-            $updated = $this->stockService->bulkChangeStockStatus($request->validated());
+            $updated = $this->stockService->bulkChangeStockStatus($request->validated(), Auth::id());
 
             return $this->success(['updated' => $updated], MessageKey::UPDATED);
         } catch (\Exception $e) {

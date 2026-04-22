@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\DemandeReservationController;
 use App\Http\Controllers\Api\DepotController;
 use App\Http\Controllers\Api\HistoriqueController;
 use App\Http\Controllers\Api\IntegrationAuthController;
+use App\Http\Controllers\Api\LivraisonController;
 use App\Http\Controllers\Api\LotController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\StockController;
@@ -82,6 +83,10 @@ Route::middleware('jwt.auth')->group(function () {
     Route::get('profile/{profile}/permissions', [ProfileController::class, 'permissions']);
     Route::put('profile/{profile}/permissions', [ProfileController::class, 'updatePermissions']);
     Route::apiResource('profile', ProfileController::class);
+    // Livraisons
+    Route::get('livraison/{id}/historiques',  [LivraisonController::class, 'historiques'])->whereNumber('id');
+    Route::post('livraison/{id}/historiques', [LivraisonController::class, 'addHistorique'])->whereNumber('id');
+    Route::apiResource('livraison', LivraisonController::class);
 });
 //to get brearer token lance this commande first
 #  php artisan integration:client:create "crm_exeedd" --scopes=integration.test --ttl=3600
