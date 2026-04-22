@@ -553,9 +553,9 @@ class StockService
             ->where('color_ex', 'like', '%' . $colorEx . '%')
             ->where('color_int', 'like', '%' . $colorInt . '%')
             ->where('reserved', false)
-            ->where(fn($q) => $q->whereNull('expose')->orWhere('expose', '!=', 1))
-            ->whereDoesntHave('depot', fn($q) => $q->whereIn('git', ['showroom', 'quarantaine']))
-            ->orderBy('created_at', 'asc');
+            // ->where(fn($q) => $q->whereNull('expose')->orWhere('expose', '!=', 1))
+            // ->whereDoesntHave('depot', fn($q) => $q->whereIn('type', ['showroom', 'quarantaine']))
+            ->orderByRaw('entree_stock_date IS NULL ASC, entree_stock_date ASC');
 
         // Groupe 1 : VIN renseigné
         $stock = $baseQuery()
