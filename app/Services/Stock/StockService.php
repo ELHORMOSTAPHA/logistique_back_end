@@ -455,6 +455,9 @@ class StockService
             });
 
         $group2 = Stock::query()
+            ->whereHas('depot', function (Builder $q) {
+                $q->where('type_depot_id', self::ENTREE_STOCK_TYPE_DEPOT_ID);
+            })
             ->where(function ($q) {
                 $q->whereNull('vin')->orWhere('vin', '');
             })
@@ -489,11 +492,10 @@ class StockService
             })
             ->orderBy('created_at', 'asc')
             ->get()
-            ->reject(fn(Stock $s) => in_array($s->id, $group1Ids, true))
             ->values()
             ->map(function (Stock $s) {
                 $s->setAttribute('in_arrivage', false);
-                $s->setAttribute('match_type', 'partial');
+                $s->setAttribute('match_type', 'exact');
                 return $s;
             });
 
