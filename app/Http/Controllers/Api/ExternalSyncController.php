@@ -35,6 +35,9 @@ class ExternalSyncController extends Controller
             'expose'                       => 'nullable|boolean',
             'in_arrivage'                  => 'nullable|boolean',
             'vendeur'                      => 'required|string|max:45',
+            'nom_client'                   => 'nullable|string|max:255',
+            'tel_client'                   => 'nullable|string|max:50',
+            'cmd_id'                       => 'nullable|string|max:100',
             'date_commande'                => 'required|date_format:Y-m-d',
             'date_livraison'               => 'required|date_format:Y-m-d',
             'net_a_payer'                  => 'required|numeric|min:0',
@@ -86,6 +89,20 @@ class ExternalSyncController extends Controller
             ]
         );
 
+        $livraison = null;
+        $statut = strtolower(trim((string) ($data['statut'] ?? '')));
+
+        if (in_array($statut, ['valider', 'valide', 'validé', 'validee', 'validée', 'accepté', 'accepte', 'acceptee', 'réservée', 'reservee'], true)) {
+            $livraisonResult = $this->livraisonService->createFromIntegration([
+                'vin'        => $data['vin'] ?? null,
+                'nom_client' => $data['nom_client'] ?? $data['vendeur'],
+                'tel_client' => $data['tel_client'] ?? null,
+                'cmd_id'     => $data['cmd_id'] ?? $data['numero_commande'],
+            ]);
+
+            $livraison = $livraisonResult['livraison'];
+        }
+
         if (!empty($data['motifs'])) {
             $demande->demandeMotifs()->delete();
             foreach ($data['motifs'] as $motif) {
@@ -115,6 +132,7 @@ class ExternalSyncController extends Controller
         return response()->json([
             'message' => $demande->wasRecentlyCreated ? 'Demande créée.' : 'Demande mise à jour.',
             'data'    => $demande->load('demandeMotifs'),
+            'livraison' => $livraison ? new LivraisonResource($livraison) : null,
         ], $statusCode);
     }
 
@@ -132,7 +150,7 @@ class ExternalSyncController extends Controller
     public function storeLivraison(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'vin'        => 'required|string|max:45',
+            'vin'        => 'nullable|string|max:45',
             'nom_client' => 'required|string|max:255',
             'tel_client' => 'nullable|string|max:50',
             'cmd_id'     => 'nullable|string|max:100',

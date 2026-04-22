@@ -2,6 +2,7 @@
 
 namespace App\Services\Livraison;
 
+use App\Models\DemandeReservation;
 use App\Models\Livraison;
 use App\Models\LivraisonHistorique;
 use App\Models\Stock;
@@ -203,16 +204,28 @@ class LivraisonService
      */
     public function createFromIntegration(array $data): array
     {
-        $vin      = trim((string) ($data['vin'] ?? ''));
-        $client   = trim(implode(' — ', array_filter([
+        $vin       = trim((string) ($data['vin'] ?? ''));
+        $telephone = trim((string) ($data['tel_client'] ?? ''));
+        $client    = trim(implode(' — ', array_filter([
             trim((string) ($data['nom_client'] ?? '')),
-            trim((string) ($data['tel_client'] ?? '')),
+            $telephone,
         ])));
-        $cmdId    = trim((string) ($data['cmd_id'] ?? ''));
+        $cmdId     = trim((string) ($data['cmd_id'] ?? ''));
 
-        $stock = $vin !== ''
-            ? Stock::query()->where('vin', $vin)->first()
-            : null;
+        // Find stock by VIN first, then fall back to demande_reservation via cmd_id
+        $stock = null;
+        if ($vin !== '') {
+            $stock = Stock::query()->where('vin', $vin)->first();
+        }
+        if ($stock === null && $cmdId !== '') {
+            $demande = DemandeReservation::query()
+                ->where('id_demande', $cmdId)
+                ->whereNotNull('stock_id')
+                ->first();
+            if ($demande) {
+                $stock = Stock::query()->find($demande->stock_id);
+            }
+        }
 
         if ($stock === null) {
             return ['livraison' => null, 'created' => false, 'stock' => null];
@@ -230,11 +243,11 @@ class LivraisonService
             return ['livraison' => $existing, 'created' => false, 'stock' => $stock];
         }
 
-        $livraison = DB::transaction(function () use ($stock, $client, $cmdId) {
+        $livraison = DB::transaction(function () use ($stock, $client, $cmdId, $telephone) {
             $livraison = Livraison::query()->create([
                 'stock_id'   => $stock->id,
                 'client'     => $client,
-                'telephone'  => $data['tel_client'] ?? null,
+                'telephone'  => $telephone !== '' ? $telephone : null,
                 'statut'     => 'en_attente',
                 'crm_cmd_id'  => $cmdId !== '' ? $cmdId : null,
                 'created_by' => null,
