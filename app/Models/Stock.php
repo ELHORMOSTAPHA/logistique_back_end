@@ -35,6 +35,7 @@ class Stock extends Model
         'reserved',
         'depot_id',
         'stock_status_id',
+        'entree_stock_date',
         'etat_avancement',
         'date_arrivage_prevu',//Date prévisionnelle de livraison
         'date_arrivage_reelle',//Date réelle de livraison
@@ -46,6 +47,8 @@ class Stock extends Model
         'deleted_by',
         //combinaison rare
         'combinaison_rare',
+        'expose',
+        'expose_date',
         'deleted_at',
         'updated_by',
     ];
@@ -58,6 +61,7 @@ class Stock extends Model
         'date_arrivage_prevu' => 'date:Y-m-d',
         'date_arrivage_reelle' => 'date:Y-m-d',
         'date_affectation' => 'date:Y-m-d',
+        // expose_date / entree_stock_date: pas de cast datetime — évite un décalage en lecture.
     ];
 
     // Relations
@@ -74,6 +78,16 @@ class Stock extends Model
     public function stockStatus(): BelongsTo
     {
         return $this->belongsTo(StockStatus::class);
+    }
+
+    public function createdByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function updatedByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by');
     }
     // public function lot(): BelongsTo
     // {

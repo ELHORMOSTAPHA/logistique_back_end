@@ -2,7 +2,9 @@
 namespace App\Services\Stock;
 
 use App\Models\DepotHistorique;
+use App\Models\Depot;
 use App\Models\Stock;
+use App\Models\TypeDepot;
 use App\Support\PaginationPayload;
 use App\Support\QueryFilterNormalizer;
 use Carbon\Carbon;
@@ -18,6 +20,13 @@ class StockService
     private const DEFAULT_STOCK_FEED_DEPOT_ID = 1;
     /** Statut par défaut appliqué aux nouvelles lignes de stock. */
     private const DEFAULT_STOCK_STATUS_ID = 1;
+    /** Dépôts `type_depot_id` = entrepôt (entrée stock) : statut + `entree_stock_date` (1ère fois). */
+    private const ENTREE_STOCK_TYPE_DEPOT_ID = 1;
+    private const ENTREE_STOCK_STATUS_ID = 4;
+    private static bool $showroomTypeDepotIdResolved = false;
+
+    /** @var int|null Primary key in `type_depots` for libellé « Showroom » (cached per request). */
+    private static ?int $showroomTypeDepotId = null;
 
     /**
      * Trace un passage du véhicule dans un dépôt lorsque `depot_id` change (ou première affectation).
@@ -33,12 +42,163 @@ class StockService
 
         // Insertion SQL explicite : heure réelle (évite toute troncature côté cast).
         // La colonne doit être DATETIME (migration 2026_04_19_120000) — si elle reste en DATE, MySQL ne garde que le jour → 00:00:00.
-        // Fuseau : `config('app.timezone')` / APP_TIMEZONE (ex. Africa/Casablanca pour le Maroc).
+        // Always store DB timestamps in UTC.
         DB::table('depot_historiques')->insert([
             'stock_id' => $stockId,
             'depot_id' => $newDepotId,
             'created_by' => $userId,
-            'created_at' => now()->format('Y-m-d H:i:s'),
+            'created_at' => Carbon::now('UTC')->format('Y-m-d H:i:s'),
+        ]);
+    }
+
+    /**
+     * Résout l’id du type « Showroom » en base (ne pas se fier à un id numérique fixe).
+     */
+    private function resolveShowroomTypeDepotId(): ?int
+    {
+        if (self::$showroomTypeDepotIdResolved) {
+            return self::$showroomTypeDepotId;
+        }
+
+        $id = TypeDepot::query()->where('libelle', 'Showroom')->value('id');
+        self::$showroomTypeDepotId = $id !== null ? (int) $id : null;
+        self::$showroomTypeDepotIdResolved = true;
+
+        return self::$showroomTypeDepotId;
+    }
+
+    private function isShowroomDepot(?int $depotId): bool
+    {
+        if ($depotId === null || $depotId < 1) {
+            return false;
+        }
+
+        $showroomTypeId = $this->resolveShowroomTypeDepotId();
+        if ($showroomTypeId === null) {
+            return false;
+        }
+
+        $typeDepotId = Depot::query()->whereKey($depotId)->value('type_depot_id');
+
+        return $typeDepotId !== null && (int) $typeDepotId === $showroomTypeId;
+    }
+
+    private function isEntreeStockDepot(?int $depotId): bool
+    {
+        if ($depotId === null || $depotId < 1) {
+            return false;
+        }
+
+        $typeId = Depot::query()->whereKey($depotId)->value('type_depot_id');
+
+        return $typeId !== null && (int) $typeId === self::ENTREE_STOCK_TYPE_DEPOT_ID;
+    }
+
+    /**
+     * Affectation à un dépôt type entrepôt (entrée stock) : `stock_status_id` imposé ;
+     * `entree_stock_date` rempli une seule fois (tant qu’il est encore null en base).
+     *
+     * @return array<string, mixed>
+     */
+    private function entreeStockDepotPayload(?int $newDepotId, ?string $currentEntreeStockDate = null): array
+    {
+        if (! $this->isEntreeStockDepot($newDepotId)) {
+            return [];
+        }
+
+        $out = [
+            'stock_status_id' => self::ENTREE_STOCK_STATUS_ID,
+        ];
+        if ($this->isBlankExposeDateString($currentEntreeStockDate)) {
+            $out['entree_stock_date'] = $this->nowStringForExposeDateColumn();
+        }
+
+        return $out;
+    }
+
+    /**
+     * Règle exposition showroom :
+     * - Dépôt showroom : `expose` = 1 ; `expose_date` une seule fois (premier passage) puis inchangé aux passages suivants.
+     * - Dépôt autre : ne rien modifier sur `expose` / `expose_date` — on garde la trace qu’un passage showroom a déjà eu lieu
+     *   (utile si le véhicule a quitté le showroom).
+     *
+     * @param  string|null  $currentExposeDate  Valeur actuelle (chaîne BDD) ; null ou vide = on pose la date « maintenant ».
+     * @return array<string, mixed>
+     */
+    private function showroomExposurePayload(bool $isShowroomDepot, ?string $currentExposeDate = null): array
+    {
+        if (! $isShowroomDepot) {
+            return [];
+        }
+
+        $out = [
+            'expose' => 1,
+        ];
+        if ($this->isBlankExposeDateString($currentExposeDate)) {
+            $out['expose_date'] = $this->nowStringForExposeDateColumn();
+        }
+
+        return $out;
+    }
+
+    private function isBlankExposeDateString(mixed $value): bool
+    {
+        if ($value === null) {
+            return true;
+        }
+        if (is_string($value) && trim($value) === '') {
+            return true;
+        }
+
+        return false;
+    }
+
+    private function asNullableExposeDateString(mixed $value): ?string
+    {
+        if ($this->isBlankExposeDateString($value)) {
+            return null;
+        }
+
+        return is_string($value) ? $value : (string) $value;
+    }
+
+    /**
+     * Heure « métier » pour `stocks.expose_date` (voir `config('app.expose_date_timezone')`, pas APP_TIMEZONE).
+     */
+    private function nowStringForExposeDateColumn(): string
+    {
+        return Carbon::now((string) config('app.expose_date_timezone', 'Africa/Casablanca'))->format('Y-m-d H:i:s');
+    }
+
+    /**
+     * Mise à jour masse : dépôt showroom avec conservation de `expose_date` existant, sinon `COALESCE(expose_date, now)`.
+     */
+    private function bulkUpdateDepotWithShowroomExposure(Builder $queryBuilder, int $depotId, ?int $userId): int
+    {
+        $now = $this->nowStringForExposeDateColumn();
+        $nowLiteral = DB::connection()->getPdo()->quote($now);
+
+        return (int) $queryBuilder->update([
+            'depot_id' => $depotId,
+            'updated_by' => $userId,
+            'expose' => 1,
+            'expose_date' => DB::raw("COALESCE(expose_date, {$nowLiteral})"),
+        ]);
+    }
+
+    /**
+     * Mise à jour masse : dépôt « entrée stock » (type 3) + statut 4, date seulement si encore null.
+     */
+    private function bulkUpdateDepotWithEntreeStock(Builder $queryBuilder, int $depotId, ?int $userId): int
+    {
+        $now = $this->nowStringForExposeDateColumn();
+        $nowLiteral = DB::connection()->getPdo()->quote($now);
+
+        return (int) $queryBuilder->update([
+            'depot_id' => $depotId,
+            'updated_by' => $userId,
+            'stock_status_id' => self::ENTREE_STOCK_STATUS_ID,
+            'entree_stock_date' => DB::raw("COALESCE(entree_stock_date, {$nowLiteral})"),
         ]);
     }
 
@@ -49,7 +209,12 @@ class StockService
     public function list(array $query): array|Collection
     {
         $f = QueryFilterNormalizer::stock($query);
-        $queryBuilder = Stock::query()->with(['depot', 'stockStatus']);
+        $queryBuilder = Stock::query()->with([
+            'depot.typeDepot',
+            'stockStatus',
+            'createdByUser',
+            'updatedByUser',
+        ]);
         $this->applyStockListFilters($queryBuilder, $f);
         $allowedSort = ['created_at', 'modele', 'vin', 'id'];
         $sortBy = in_array($f['sort_by'], $allowedSort, true) ? $f['sort_by'] : 'created_at';
@@ -179,10 +344,13 @@ class StockService
         ]);
     }
 
+    
     public function bulkChangeDepot(array $data): int
     {
         $userId = auth()->id();
         $depotId = (int) ($data['depot_id'] ?? 0);
+        $isShowroomDepot = $this->isShowroomDepot($depotId);
+        $isEntreeStockDepot = $this->isEntreeStockDepot($depotId);
 
         if (! empty($data['select_all'])) {
             $filters = is_array($data['filters'] ?? null) ? $data['filters'] : [];
@@ -194,10 +362,16 @@ class StockService
             }
 
             $stocks = (clone $queryBuilder)->get(['id', 'depot_id']);
-            $count = $queryBuilder->update([
-                'depot_id' => $depotId,
-                'updated_by' => $userId,
-            ]);
+            if ($isShowroomDepot) {
+                $count = $this->bulkUpdateDepotWithShowroomExposure($queryBuilder, $depotId, $userId);
+            } elseif ($isEntreeStockDepot) {
+                $count = $this->bulkUpdateDepotWithEntreeStock($queryBuilder, $depotId, $userId);
+            } else {
+                $count = (int) $queryBuilder->update([
+                    'depot_id' => $depotId,
+                    'updated_by' => $userId,
+                ]);
+            }
             foreach ($stocks as $stock) {
                 $this->recordStockDepotHistorique(
                     (int) $stock->id,
@@ -216,10 +390,17 @@ class StockService
         }
 
         $stocks = Stock::query()->whereIn('id', $ids)->get(['id', 'depot_id']);
-        $count = Stock::query()->whereIn('id', $ids)->update([
-            'depot_id' => $depotId,
-            'updated_by' => $userId,
-        ]);
+        $idQuery = Stock::query()->whereIn('id', $ids);
+        if ($isShowroomDepot) {
+            $count = $this->bulkUpdateDepotWithShowroomExposure($idQuery, $depotId, $userId);
+        } elseif ($isEntreeStockDepot) {
+            $count = $this->bulkUpdateDepotWithEntreeStock($idQuery, $depotId, $userId);
+        } else {
+            $count = (int) $idQuery->update([
+                'depot_id' => $depotId,
+                'updated_by' => $userId,
+            ]);
+        }
         foreach ($stocks as $stock) {
             $this->recordStockDepotHistorique(
                 (int) $stock->id,
@@ -241,6 +422,7 @@ class StockService
      * 3) Same (modele, finition) with VIN and not reserved; color matches on color_ex OR color_int.
      *
      * Note: partner request might not send `finition`, so we fallback `finition = version`.
+     * Groupe 1 and 2: only stock whose `depot` has `type_depot_id` = entrepôt stockage (same as `ENTREE_STOCK_TYPE_DEPOT_ID`).
      *
      * @param  array<string, mixed>  $query
      * @return Collection<int, Stock>|array<string, mixed>
@@ -256,6 +438,9 @@ class StockService
         $finition = (string) $query['version'];
 
         $group1 = Stock::query()
+            ->whereHas('depot', function (Builder $q) {
+                $q->where('type_depot_id', self::ENTREE_STOCK_TYPE_DEPOT_ID);
+            })
             ->where('modele', 'like', '%' . $modele . '%')
             ->where('marque', 'like', '%' . $marque . '%')
             ->where('finition', 'like', '%' . $finition . '%')
@@ -293,6 +478,9 @@ class StockService
         $group1Ids = $group1->pluck('id')->all();
 
         $group3 = Stock::query()
+        ->whereHas('depot', function (Builder $q) {
+            $q->where('type_depot_id', self::ENTREE_STOCK_TYPE_DEPOT_ID);
+        })
             ->whereNotNull('vin')
             ->where('vin', '!=', '')
             ->where('reserved', false)
@@ -399,6 +587,14 @@ class StockService
     {
         try {
             $attributes = $this->stockCreateAttributes($data);
+            if (isset($attributes['depot_id']) && (int) $attributes['depot_id'] > 0) {
+                $newDep = (int) $attributes['depot_id'];
+                $attributes = array_merge(
+                    $attributes,
+                    $this->showroomExposurePayload($this->isShowroomDepot($newDep)),
+                    $this->entreeStockDepotPayload($newDep, null),
+                );
+            }
             $attributes['created_by'] = $userId;
             $stock = Stock::query()->create($attributes);
             if (isset($attributes['depot_id']) && (int) $attributes['depot_id'] > 0) {
@@ -428,20 +624,122 @@ class StockService
             $stock = Stock::findOrFail($id);
             $previousDepotId = $stock->depot_id;
             $payload = $this->stockUpdateAttributes($validated);
+            if (array_key_exists('depot_id', $payload)) {
+                $newDepotId = $payload['depot_id'] !== null ? (int) $payload['depot_id'] : null;
+                $payload = array_merge(
+                    $payload,
+                    $this->showroomExposurePayload(
+                        $this->isShowroomDepot($newDepotId),
+                        $this->asNullableExposeDateString($stock->expose_date),
+                    ),
+                    $this->entreeStockDepotPayload(
+                        $newDepotId,
+                        $this->asNullableExposeDateString($stock->entree_stock_date),
+                    ),
+                );
+            }
             if ($payload !== [] && $userId !== null) {
                 $payload['updated_by'] = $userId;
             }
             if ($payload !== []) {
                 $stock->update($payload);
+                $stock->refresh();
             }
+            // Business rule: toggling "combinaison rare" applies to the full configuration set
+            // (marque, modele, finition, color_ex, color_int).
+            if (array_key_exists('combinaison_rare', $payload)) {
+                $rareValue = (bool) $payload['combinaison_rare'];
+                $sameConfig = Stock::query();
+                $this->applySameConfigurationFilter($sameConfig, $stock);
+                $sameConfig->update(array_filter([
+                    'combinaison_rare' => $rareValue,
+                    'updated_by' => $userId,
+                ], static fn ($v) => $v !== null));
+            }
+
             if (array_key_exists('depot_id', $payload)) {
                 $newDepotId = $payload['depot_id'] !== null ? (int) $payload['depot_id'] : null;
                 $this->recordStockDepotHistorique((int) $stock->id, $previousDepotId !== null ? (int) $previousDepotId : null, $newDepotId, $userId);
             }
-            return $stock;
+            return Stock::query()->find($id);
         } catch (\Exception $e) {
             throw new \Exception($e->getMessage());
         }
+    }
+
+    private function applySameConfigurationFilter(Builder $query, Stock $stock): void
+    {
+        foreach (['modele', 'marque', 'color_ex', 'color_int', 'finition'] as $field) {
+            $value = $stock->{$field};
+            if ($value === null || $value === '') {
+                $query->where(static function (Builder $q) use ($field): void {
+                    $q->whereNull($field)->orWhere($field, '');
+                });
+                continue;
+            }
+            $query->where($field, $value);
+        }
+    }
+
+    /**
+     * @return array<string, true> Set of normalized rare configuration keys.
+     */
+    private function loadRareConfigurationKeys(): array
+    {
+        $keys = [];
+        $rows = Stock::query()
+            ->where('combinaison_rare', true)
+            ->get(['modele', 'marque', 'color_ex', 'color_int', 'finition']);
+
+        foreach ($rows as $row) {
+            $keys[$this->configurationKey(
+                $row->modele,
+                $row->marque,
+                $row->color_ex,
+                $row->color_int,
+                $row->finition,
+            )] = true;
+        }
+
+        return $keys;
+    }
+
+    /**
+     * @param  array<string, mixed>  $attrs
+     */
+    private function configurationKeyFromAttributes(array $attrs): string
+    {
+        return $this->configurationKey(
+            isset($attrs['modele']) ? (string) $attrs['modele'] : null,
+            isset($attrs['marque']) ? (string) $attrs['marque'] : null,
+            isset($attrs['color_ex']) ? (string) $attrs['color_ex'] : null,
+            isset($attrs['color_int']) ? (string) $attrs['color_int'] : null,
+            isset($attrs['finition']) ? (string) $attrs['finition'] : null,
+        );
+    }
+
+    private function configurationKey(
+        ?string $modele,
+        ?string $marque,
+        ?string $colorEx,
+        ?string $colorInt,
+        ?string $finition,
+    ): string {
+        return implode('|', [
+            $this->normalizeConfigurationValue($modele),
+            $this->normalizeConfigurationValue($marque),
+            $this->normalizeConfigurationValue($colorEx),
+            $this->normalizeConfigurationValue($colorInt),
+            $this->normalizeConfigurationValue($finition),
+        ]);
+    }
+
+    private function normalizeConfigurationValue(?string $value): string
+    {
+        if ($value === null) {
+            return '';
+        }
+        return Str::lower(trim($value));
     }
 
     public function delete(int $id): bool
@@ -469,10 +767,16 @@ class StockService
         $previousDepotId = $stock->depot_id;
         $newDepotId = (int) $data['depot_id'];
 
-        $stock->update([
+        $stock->update(array_merge([
             'depot_id' => $newDepotId,
             'updated_by' => $userId,
-        ]);
+        ], $this->showroomExposurePayload(
+            $this->isShowroomDepot($newDepotId),
+            $this->asNullableExposeDateString($stock->expose_date),
+        ), $this->entreeStockDepotPayload(
+            $newDepotId,
+            $this->asNullableExposeDateString($stock->entree_stock_date),
+        )));
         $this->recordStockDepotHistorique(
             (int) $stock->id,
             $previousDepotId !== null ? (int) $previousDepotId : null,
@@ -506,6 +810,7 @@ class StockService
         $messages = [];
         $createdDetails = [];
         $updatedDetails = [];
+        $rareConfigurationKeys = $importMode === 'stock_feed' ? $this->loadRareConfigurationKeys() : [];
 
         foreach ($rows as $index => $row) {
             $lineNo = $index + 1;
@@ -535,12 +840,19 @@ class StockService
                 }
 
                 try {
-                    DB::transaction(function () use ($row, $userId, &$created) {
+                    DB::transaction(function () use ($row, $userId, &$created, &$rareConfigurationKeys) {
                         $attrs = $this->stockAttributesFromImportRow($row);
+                        $configKey = $this->configurationKeyFromAttributes($attrs);
+                        if (isset($rareConfigurationKeys[$configKey])) {
+                            $attrs['combinaison_rare'] = true;
+                        }
                         $stock = Stock::query()->create(array_merge($attrs, [
                             'created_by' => $userId,
                             'updated_by' => $userId,
                         ]));
+                        if (! empty($stock->combinaison_rare)) {
+                            $rareConfigurationKeys[$configKey] = true;
+                        }
                         $created++;
                     });
 

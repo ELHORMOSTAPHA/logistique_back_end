@@ -19,7 +19,7 @@ class DatabaseSeeder extends Seeder
             ModulePermissionSeeder::class,
             UserSeeder::class,
             StockStatusSeeder::class,
-            // TypeDepotSeeder::class,
+            TypeDepotSeeder::class,
             // DepotSeeder::class,
             // StockSeeder::class,
             // DepotHistoriqueSeeder::class,

@@ -20,7 +20,7 @@ class StockStatusController extends Controller
     {
         $rows = StockStatus::query()
             ->orderBy('id')
-            ->get(['id', 'name', 'stock_status']);
+            ->get(['id', 'libelle']);
 
         return $this->success($rows, MessageKey::FETCHED);
     }
