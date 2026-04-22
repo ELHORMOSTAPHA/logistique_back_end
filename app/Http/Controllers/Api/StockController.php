@@ -2,18 +2,18 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\MessageKey;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Stock\BulkAssignLotStockRequest;
 use App\Http\Requests\Stock\BulkChangeDepotStockRequest;
 use App\Http\Requests\Stock\BulkChangeStockStatusRequest;
 use App\Http\Requests\Stock\ChangeDepotStockRequest;
 use App\Http\Requests\Stock\ImportStockRequest;
-use App\Http\Requests\Stock\PreviewVinUpdateRequest;
-use App\Http\Requests\Stock\listStockAproximit;
 use App\Http\Requests\Stock\IndexStockRequest;
+use App\Http\Requests\Stock\listStockAproximit;
+use App\Http\Requests\Stock\PreviewVinUpdateRequest;
 use App\Http\Requests\Stock\StoreStockRequest;
 use App\Http\Requests\Stock\UpdateStockRequest;
-use App\Enums\MessageKey;
 use App\Http\Resources\Stock\OldVinInStockResource;
 use App\Models\Stock;
 use App\Services\Stock\StockService;
@@ -37,6 +37,7 @@ class StockController extends Controller
     {
         try {
             $stocks = $this->stockService->list($request->validated());
+
             return $this->success($stocks, MessageKey::FETCHED);
         } catch (\Exception $e) {
             return $this->error(MessageKey::SERVER, $e->getMessage());
@@ -51,6 +52,8 @@ class StockController extends Controller
     {
         try {
             $stock = $this->stockService->create($request->validated(), Auth::id());
+            $this->audit('create', 'stocks', (int) $stock->id, null, $request->validated());
+
             return $this->success($stock, MessageKey::CREATED);
         } catch (\Exception $e) {
             return $this->error(MessageKey::SERVER, $e->getMessage());
@@ -95,6 +98,8 @@ class StockController extends Controller
     {
         try {
             $stock = $this->stockService->update($id, $request->validated(), Auth::id());
+            $this->audit('update', 'stocks', $id, null, $request->validated());
+
             return $this->success($stock, MessageKey::UPDATED);
         } catch (\Exception $e) {
             return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
@@ -111,6 +116,8 @@ class StockController extends Controller
             return response()->json(['message' => 'Véhicule introuvable.'], 404);
         }
 
+        $this->audit('delete', 'stocks', $id);
+
         return response()->json(['message' => 'Véhicule supprimé du stock.']);
     }
 
@@ -122,6 +129,7 @@ class StockController extends Controller
     {
         try {
             $updated = $this->stockService->bulkAssignNumeroLot($request->validated(), Auth::id());
+            $this->audit('bulk_assign_lot', 'stocks', null, null, $request->validated());
 
             return $this->success(['updated' => $updated], MessageKey::UPDATED);
         } catch (\Exception $e) {
@@ -137,6 +145,7 @@ class StockController extends Controller
     {
         try {
             $updated = $this->stockService->bulkChangeDepot($request->validated(), Auth::id());
+            $this->audit('bulk_change_depot', 'stocks', null, null, $request->validated());
 
             return $this->success(['updated' => $updated], MessageKey::UPDATED);
         } catch (\Exception $e) {
@@ -152,6 +161,7 @@ class StockController extends Controller
     {
         try {
             $updated = $this->stockService->bulkChangeStockStatus($request->validated(), Auth::id());
+            $this->audit('bulk_change_stock_status', 'stocks', null, null, $request->validated());
 
             return $this->success(['updated' => $updated], MessageKey::UPDATED);
         } catch (\Exception $e) {
@@ -171,11 +181,14 @@ class StockController extends Controller
             return response()->json(['message' => 'Véhicule introuvable.'], 404);
         }
 
+        $this->audit('change_depot', 'stocks', $id, null, $request->validated());
+
         return response()->json([
             'message' => 'Dépôt mis à jour avec succès.',
             'data' => $stock,
         ]);
     }
+
     // import JSON rows from file drop
     public function importStock(ImportStockRequest $request): JsonResponse
     {
@@ -185,6 +198,11 @@ class StockController extends Controller
                 Auth::id(),
                 (string) $request->validated('import_mode', 'stock_feed')
             );
+            $this->audit('import_stock', 'stocks', null, null, [
+                'import_mode' => $request->validated('import_mode', 'stock_feed'),
+                'rows_count' => count($request->validated('rows', [])),
+            ]);
+
             return $this->success($result, MessageKey::CREATED);
         } catch (\Exception $e) {
             return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
@@ -214,6 +232,7 @@ class StockController extends Controller
     {
         try {
             $result = $this->stockService->listStockAproximit($request->validated());
+
             return $this->success($result, MessageKey::FETCHED);
         } catch (\Exception $e) {
             return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
@@ -229,7 +248,7 @@ class StockController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => 'Aucun véhicule correspondant trouvé.',
-                    'data' => null
+                    'data' => null,
                 ], 404);
             }
 

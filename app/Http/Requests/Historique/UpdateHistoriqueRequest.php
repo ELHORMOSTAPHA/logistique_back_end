@@ -23,6 +23,11 @@ class UpdateHistoriqueRequest extends FormRequest
             'record_id' => ['sometimes', 'nullable', 'integer'],
             'old_value' => ['sometimes', 'nullable', 'string'],
             'new_value' => ['sometimes', 'nullable', 'string'],
+            'metadata' => ['sometimes', 'nullable', 'array'],
+            'ip_address' => ['sometimes', 'nullable', 'string', 'max:64'],
+            'http_method' => ['sometimes', 'nullable', 'string', 'max:12'],
+            'request_path' => ['sometimes', 'nullable', 'string', 'max:512'],
+            'user_agent' => ['sometimes', 'nullable', 'string', 'max:65535'],
         ];
     }
 }

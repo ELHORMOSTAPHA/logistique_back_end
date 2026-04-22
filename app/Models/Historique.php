@@ -21,6 +21,11 @@ class Historique extends Model
         'record_id',
         'old_value',
         'new_value',
+        'metadata',
+        'ip_address',
+        'http_method',
+        'request_path',
+        'user_agent',
         'created_by',
         'created_at',
     ];
@@ -29,6 +34,7 @@ class Historique extends Model
     {
         return [
             'created_at' => 'datetime',
+            'metadata' => 'array',
         ];
     }
 }

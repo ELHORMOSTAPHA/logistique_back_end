@@ -23,6 +23,11 @@ class StoreHistoriqueRequest extends FormRequest
             'record_id' => ['nullable', 'integer'],
             'old_value' => ['nullable', 'string'],
             'new_value' => ['nullable', 'string'],
+            'metadata' => ['nullable', 'array'],
+            'ip_address' => ['nullable', 'string', 'max:64'],
+            'http_method' => ['nullable', 'string', 'max:12'],
+            'request_path' => ['nullable', 'string', 'max:512'],
+            'user_agent' => ['nullable', 'string', 'max:65535'],
         ];
     }
 }

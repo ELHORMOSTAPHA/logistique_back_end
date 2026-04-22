@@ -27,6 +27,7 @@ class LivraisonController extends Controller
     {
         try {
             $result = $this->livraisonService->list($request->query());
+
             return $this->success($result, MessageKey::FETCHED);
         } catch (\Exception $e) {
             return $this->error(MessageKey::SERVER, $e->getMessage());
@@ -37,6 +38,8 @@ class LivraisonController extends Controller
     {
         try {
             $livraison = $this->livraisonService->create($request->validated(), Auth::id());
+            $this->audit('create', 'livraisons', (int) $livraison->id, null, $request->validated());
+
             return $this->success(new LivraisonResource($livraison), MessageKey::CREATED);
         } catch (\Exception $e) {
             return $this->error(MessageKey::SERVER, $e->getMessage());
@@ -50,6 +53,7 @@ class LivraisonController extends Controller
             if (! $livraison) {
                 return $this->error(MessageKey::NOT_FOUND, null, 404);
             }
+
             return $this->success(new LivraisonResource($livraison), MessageKey::FETCHED);
         } catch (\Exception $e) {
             return $this->error(MessageKey::SERVER, $e->getMessage());
@@ -63,6 +67,8 @@ class LivraisonController extends Controller
             if (! $livraison) {
                 return $this->error(MessageKey::NOT_FOUND, null, 404);
             }
+            $this->audit('update', 'livraisons', $id, null, $request->validated());
+
             return $this->success(new LivraisonResource($livraison), MessageKey::UPDATED);
         } catch (\Exception $e) {
             return $this->error(MessageKey::SERVER, $e->getMessage());
@@ -75,6 +81,8 @@ class LivraisonController extends Controller
             if (! $this->livraisonService->delete($id)) {
                 return $this->error(MessageKey::NOT_FOUND, null, 404);
             }
+            $this->audit('delete', 'livraisons', $id);
+
             return $this->success(null, MessageKey::DELETED);
         } catch (\Exception $e) {
             return $this->error(MessageKey::SERVER, $e->getMessage());
@@ -88,6 +96,10 @@ class LivraisonController extends Controller
             if (! $historique) {
                 return $this->error(MessageKey::NOT_FOUND, null, 404);
             }
+            $this->audit('add_row', 'livraison_historiques', (int) $historique->id, null, $request->validated(), [
+                'livraison_id' => $id,
+            ]);
+
             return $this->success(new LivraisonHistoriqueResource($historique), MessageKey::CREATED);
         } catch (\Exception $e) {
             return $this->error(MessageKey::SERVER, $e->getMessage());
@@ -101,6 +113,7 @@ class LivraisonController extends Controller
             if ($historiques === null) {
                 return $this->error(MessageKey::NOT_FOUND, null, 404);
             }
+
             return $this->success(LivraisonHistoriqueResource::collection($historiques), MessageKey::FETCHED);
         } catch (\Exception $e) {
             return $this->error(MessageKey::SERVER, $e->getMessage());

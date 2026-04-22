@@ -56,6 +56,14 @@ class IntegrationAuthController extends Controller
         $client->last_used_at = Carbon::now();
         $client->save();
 
+        $this->audit(
+            'integration.token',
+            'integration_clients',
+            (int) $client->id,
+            null,
+            ['client_id' => $client->client_id],
+        );
+
         return response()->json([
             'success' => true,
             'message' => 'Integration token generated successfully.',

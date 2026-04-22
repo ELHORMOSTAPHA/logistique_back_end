@@ -37,7 +37,7 @@ class HistoriqueController extends Controller
         try {
             $row = $this->historiqueService->create($request->validated(), Auth::id());
 
-            return $this->success($row, MessageKey::CREATED, 201);
+            return $this->success($this->historiqueService->presentForApi($row), MessageKey::CREATED, 201);
         } catch (\Exception $e) {
             return $this->error(MessageKey::SERVER, $e->getMessage());
         }
@@ -45,7 +45,7 @@ class HistoriqueController extends Controller
 
     public function show(Historique $historique): JsonResponse
     {
-        return $this->success($historique, MessageKey::FETCHED);
+        return $this->success($this->historiqueService->presentForApi($historique), MessageKey::FETCHED);
     }
 
     public function update(UpdateHistoriqueRequest $request, Historique $historique): JsonResponse
@@ -57,7 +57,7 @@ class HistoriqueController extends Controller
                 return $this->error(MessageKey::NOT_FOUND, null, 404);
             }
 
-            return $this->success($updated, MessageKey::UPDATED);
+            return $this->success($this->historiqueService->presentForApi($updated), MessageKey::UPDATED);
         } catch (\Exception $e) {
             return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
         }

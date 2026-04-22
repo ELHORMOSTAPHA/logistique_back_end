@@ -36,6 +36,7 @@ class UtilisateurController extends Controller
     {
         try {
             $user = $this->utilisateurService->create($request->toDto());
+            $this->audit('create', 'users', (int) $user->id, null, $request->except(['password', 'password_confirmation']));
 
             return $this->success($user->load('profile'), MessageKey::CREATED, 201);
         } catch (\Exception $e) {
@@ -59,6 +60,8 @@ class UtilisateurController extends Controller
                 return $this->error(MessageKey::NOT_FOUND, null, 404);
             }
 
+            $this->audit('update', 'users', $utilisateur->id, null, $request->except(['password', 'password_confirmation']));
+
             return $this->success($updated, MessageKey::UPDATED);
         } catch (\Exception $e) {
             return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
@@ -71,6 +74,8 @@ class UtilisateurController extends Controller
             return $this->error(MessageKey::NOT_FOUND, null, 404);
         }
 
+        $this->audit('delete', 'users', $utilisateur->id);
+
         return $this->success(null, MessageKey::DELETED);
     }
 
@@ -78,6 +83,7 @@ class UtilisateurController extends Controller
     {
         try {
             $updated = $this->utilisateurService->bulkUpdateStatut($request->validated());
+            $this->audit('bulk_update_status', 'users', null, null, $request->validated());
 
             return $this->success(['updated' => $updated], MessageKey::UPDATED);
         } catch (\InvalidArgumentException $e) {

@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Enums\MessageKey;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\DemandeModificationVin\IndexDemandeModificationVinRequest;
-use App\Http\Requests\DemandeModificationVin\StoreDemandeModificationVinRequest;
 use App\Http\Requests\DemandeModificationVin\RefuserDemandeModificationVinRequest;
+use App\Http\Requests\DemandeModificationVin\StoreDemandeModificationVinRequest;
 use App\Http\Resources\DemandeModificationVinResource;
 use App\Models\DemandeModificationVin;
 use App\Services\DemandeReservation\DemandeModificationVinService;
@@ -49,6 +49,7 @@ class DemandeModificationVinController extends Controller
     {
         try {
             $row = $this->service->create($request->validated(), Auth::id());
+            $this->audit('create', 'demande_modification_vins', (int) $row->id, null, $request->validated());
 
             return $this->success(
                 new DemandeModificationVinResource($row->load(['demandeReservation', 'stock', 'demandeur'])),
@@ -84,6 +85,8 @@ class DemandeModificationVinController extends Controller
                 return $this->error(MessageKey::INVALID, 'La demande ne peut pas être approuvée (déjà traitée ou introuvable).', 422);
             }
 
+            $this->audit('approuver', 'demande_modification_vins', $demande_modification_vin->id);
+
             return $this->success(new DemandeModificationVinResource($updated), MessageKey::UPDATED);
         } catch (\Exception $e) {
             return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
@@ -106,6 +109,8 @@ class DemandeModificationVinController extends Controller
                 return $this->error(MessageKey::INVALID, 'La demande ne peut pas être refusée (déjà traitée ou introuvable).', 422);
             }
 
+            $this->audit('refuser', 'demande_modification_vins', $demande_modification_vin->id, null, $request->validated());
+
             return $this->success(new DemandeModificationVinResource($updated), MessageKey::UPDATED);
         } catch (\Exception $e) {
             return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
@@ -120,6 +125,8 @@ class DemandeModificationVinController extends Controller
         if (! $this->service->delete($demande_modification_vin->id)) {
             return $this->error(MessageKey::NOT_FOUND, null, 404);
         }
+
+        $this->audit('delete', 'demande_modification_vins', $demande_modification_vin->id);
 
         return $this->success(null, MessageKey::DELETED);
     }

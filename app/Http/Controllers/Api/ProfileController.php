@@ -37,6 +37,7 @@ class ProfileController extends Controller
     {
         try {
             $profile = $this->profileService->create($request->toDto());
+            $this->audit('create', 'profiles', (int) $profile->id, null, $request->validated());
 
             return $this->success($profile, MessageKey::CREATED, 201);
         } catch (\Exception $e) {
@@ -58,6 +59,8 @@ class ProfileController extends Controller
                 return $this->error(MessageKey::NOT_FOUND, null, 404);
             }
 
+            $this->audit('update', 'profiles', $profile->id, null, $request->validated());
+
             return $this->success($updated, MessageKey::UPDATED);
         } catch (\Exception $e) {
             return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
@@ -70,6 +73,8 @@ class ProfileController extends Controller
             return $this->error(MessageKey::NOT_FOUND, null, 404);
         }
 
+        $this->audit('delete', 'profiles', $profile->id);
+
         return $this->success(null, MessageKey::DELETED);
     }
 
@@ -77,6 +82,7 @@ class ProfileController extends Controller
     {
         try {
             $updated = $this->profileService->bulkUpdateStatut($request->validated());
+            $this->audit('bulk_update_status', 'profiles', null, null, $request->validated());
 
             return $this->success(['updated' => $updated], MessageKey::UPDATED);
         } catch (\InvalidArgumentException $e) {
@@ -102,6 +108,7 @@ class ProfileController extends Controller
         try {
             $validated = $request->validated();
             $this->profileService->syncPermissions((int) $profile->id, $validated['permissions']);
+            $this->audit('sync_permissions', 'profiles', (int) $profile->id, null, ['permissions' => $validated['permissions']]);
 
             return $this->success(
                 $this->profileService->permissionMatrix((int) $profile->id),

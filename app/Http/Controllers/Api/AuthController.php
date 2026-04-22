@@ -84,14 +84,16 @@ class AuthController extends Controller
         //     'expires_in' => 3600,
         //     'user' => new UserResource($user),
         // ], MessageKey::LOGIN_SUCCESS);
-    return $this->success([
-        'access_token' => $accessToken,
-        'refresh_token' => $refreshToken,
-        'fbm_token' => $user->fbm_token,
-        'token_type' => 'Bearer',
-        'expires_in' => 3600,
-        'user' => new UserResource($user),
-    ], MessageKey::LOGIN_SUCCESS);
+        $this->audit('auth.login', 'users', (int) $user->id, null, null, ['email' => $user->email], (int) $user->id);
+
+        return $this->success([
+            'access_token' => $accessToken,
+            'refresh_token' => $refreshToken,
+            'fbm_token' => $user->fbm_token,
+            'token_type' => 'Bearer',
+            'expires_in' => 3600,
+            'user' => new UserResource($user),
+        ], MessageKey::LOGIN_SUCCESS);
     }
 
     public function me(Request $request)
@@ -166,6 +168,8 @@ class AuthController extends Controller
 
             $accessToken = JWTHelper::generateAccessToken($user->id);
             $refreshToken = JWTHelper::generateRefreshToken($user->id);
+
+            $this->audit('auth.refresh', 'users', (int) $user->id, null, null, null, (int) $user->id);
 
             return $this->successFlat([
                 'access_token' => $accessToken,
