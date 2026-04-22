@@ -10,6 +10,7 @@ use App\Http\Requests\DemandeReservation\UpdateDemandeReservationRequest;
 use App\Http\Requests\DemandeReservation\AffecterVinRequest;
 use App\Http\Resources\DemandeReservationResource;
 use App\Models\DemandeReservation;
+use App\Models\Stock;
 use App\Services\DemandeReservation\DemandeReservationService;
 use App\Traits\ApiResponsable;
 use Illuminate\Http\JsonResponse;
@@ -109,6 +110,20 @@ class DemandeReservationController extends Controller
         try {
             $stocks = $this->demandeReservationService->getMatchingVinStock($demande_reservation);
             return $this->success($stocks, MessageKey::FETCHED);
+        } catch (\Exception $e) {
+            return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
+        }
+    }
+
+    public function matchingVinByStock(Stock $stock): JsonResponse
+    {
+        try {
+            $row = $this->demandeReservationService->getVinStockRowForAffectation($stock->id);
+            if ($row === null) {
+                return $this->error(MessageKey::NOT_FOUND, null, 404);
+            }
+
+            return $this->success($row, MessageKey::FETCHED);
         } catch (\Exception $e) {
             return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
         }

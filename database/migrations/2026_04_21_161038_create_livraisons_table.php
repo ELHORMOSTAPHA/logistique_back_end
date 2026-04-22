@@ -16,8 +16,6 @@ return new class extends Migration
             $table->foreignId('stock_id')->constrained('stocks')->cascadeOnDelete();
             $table->string('client', 255);
             $table->string('statut', 50)->default('en_attente')->comment('en_attente, facturé, livré');
-            $table->string('ww', 50)->nullable()->comment('Numéro WW livraison');
-            $table->string('n_facture', 100)->nullable()->comment('Numéro de facture');
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();

@@ -270,6 +270,36 @@ class DemandeReservationService
     }
 
     /**
+     * Single stock row for affectation UI (same shape as getMatchingVinStock items).
+     *
+     * @return array<string, mixed>|null
+     */
+    public function getVinStockRowForAffectation(int $stockId): ?array
+    {
+        $stock = Stock::query()->find($stockId);
+        if (! $stock) {
+            return null;
+        }
+
+        $createdAt = Carbon::parse($stock->created_at);
+
+        return [
+            'id'             => $stock->id,
+            'vin'            => $stock->vin,
+            'has_vin'        => ! empty($stock->vin),
+            'in_arrivage'    => false,
+            'marque'         => $stock->marque,
+            'modele'         => $stock->modele,
+            'finition'       => $stock->finition,
+            'color_ex'       => $stock->color_ex,
+            'color_int'      => $stock->color_int,
+            'reserved'       => (bool) $stock->reserved,
+            'stock_age_days' => (int) $createdAt->diffInDays(now()),
+            'created_at'     => $stock->created_at,
+        ];
+    }
+
+    /**
      * Change the VIN on an already-accepted demande and sync to CRM order_items.
      *
      * @param  array<string, mixed>  $data

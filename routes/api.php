@@ -62,7 +62,8 @@ Route::middleware('jwt.auth')->group(function () {
     Route::apiResource('depot', DepotController::class);
     //historique
     Route::apiResource('historique', HistoriqueController::class);
-    //demande_reservation
+    //demande_reservation — route dédiée avant apiResource (évite la confusion avec un id numérique)
+    Route::get('demande_reservation/matching-vin-by-stock/{stock}', [DemandeReservationController::class, 'matchingVinByStock']);
     Route::apiResource('demande_reservation', DemandeReservationController::class);
     Route::get('demande_reservation/{demande_reservation}/matching-stock',  [DemandeReservationController::class, 'matchingStock']);
     Route::post('demande_reservation/{demande_reservation}/affecter-vin',   [DemandeReservationController::class, 'affecterVin']);
