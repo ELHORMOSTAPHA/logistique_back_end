@@ -4,6 +4,7 @@ namespace App\Services\Livraison;
 
 use App\Models\Livraison;
 use App\Models\LivraisonHistorique;
+use App\Models\Stock;
 use App\Support\PaginationPayload;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -143,15 +144,27 @@ class LivraisonService
         }
 
         return DB::transaction(function () use ($livraison, $data, $userId) {
-            $livraison->update([
+            $updatePayload = [
                 'statut'     => $data['statut'],
                 'updated_by' => $userId,
-            ]);
+            ];
+
+            if ($data['statut'] === 'facturé' && ! empty($data['n_facture'])) {
+                $updatePayload['n_facture'] = $data['n_facture'];
+            }
+
+            if ($data['statut'] === 'livré' && ! empty($data['ww'])) {
+                $updatePayload['ww'] = $data['ww'];
+            }
+
+            $livraison->update($updatePayload);
+
+            $infos = $data['n_facture'] ?? $data['ww'] ?? null;
 
             $historique = LivraisonHistorique::query()->create([
                 'livraison_id' => $livraison->id,
                 'statut'       => $data['statut'],
-                'infos'        => $data['infos'] ?? null,
+                'infos'        => $infos,
                 'created_by'   => $userId,
             ]);
 
@@ -175,5 +188,71 @@ class LivraisonService
             ->with('creator')
             ->orderByDesc('created_at')
             ->get();
+    }
+
+    /**
+     * Crée une livraison depuis une intégration externe (système-à-système).
+     *
+     * - Cherche le stock par VIN (exact, non supprimé).
+     * - Si déjà une livraison active (non-livrée) sur ce stock, retourne celle-ci sans doublon.
+     * - Construit le `client` à partir de `nom_client` + `tel_client`.
+     * - Le `cmd_id` est enregistré dans le champ `n_facture` (référence commande externe).
+     *
+     * @param  array<string, mixed>  $data  Keys: vin, nom_client, tel_client, cmd_id
+     * @return array{livraison: Livraison, created: bool, stock: Stock|null}
+     */
+    public function createFromIntegration(array $data): array
+    {
+        $vin      = trim((string) ($data['vin'] ?? ''));
+        $client   = trim(implode(' — ', array_filter([
+            trim((string) ($data['nom_client'] ?? '')),
+            trim((string) ($data['tel_client'] ?? '')),
+        ])));
+        $cmdId    = trim((string) ($data['cmd_id'] ?? ''));
+
+        $stock = $vin !== ''
+            ? Stock::query()->where('vin', $vin)->first()
+            : null;
+
+        if ($stock === null) {
+            return ['livraison' => null, 'created' => false, 'stock' => null];
+        }
+
+        // Avoid creating a duplicate active livraison for the same stock
+        $existing = Livraison::query()
+            ->where('stock_id', $stock->id)
+            ->whereIn('statut', ['en_attente', 'facturé'])
+            ->latest()
+            ->first();
+
+        if ($existing) {
+            $existing->load(['stock', 'creator', 'livraisonHistoriques.creator']);
+            return ['livraison' => $existing, 'created' => false, 'stock' => $stock];
+        }
+
+        $livraison = DB::transaction(function () use ($stock, $client, $cmdId) {
+            $livraison = Livraison::query()->create([
+                'stock_id'   => $stock->id,
+                'client'     => $client,
+                'telephone'  => $data['tel_client'] ?? null,
+                'statut'     => 'en_attente',
+                'crm_cmd_id'  => $cmdId !== '' ? $cmdId : null,
+                'created_by' => null,
+                'updated_by' => null,
+            ]);
+
+            LivraisonHistorique::query()->create([
+                'livraison_id' => $livraison->id,
+                'statut'       => 'en_attente',
+                'infos'        => $cmdId !== '' ? 'cmd_id: ' . $cmdId : null,
+                'created_by'   => null,
+            ]);
+
+            $livraison->load(['stock', 'creator', 'livraisonHistoriques.creator']);
+
+            return $livraison;
+        });
+
+        return ['livraison' => $livraison, 'created' => true, 'stock' => $stock];
     }
 }

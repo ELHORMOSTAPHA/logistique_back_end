@@ -15,10 +15,10 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            ProfileSeeder::class,
-            ModulePermissionSeeder::class,
-            UserSeeder::class,
-            StockStatusSeeder::class,
+            // ProfileSeeder::class,
+            // ModulePermissionSeeder::class,
+            // UserSeeder::class,
+            // StockStatusSeeder::class,
             TypeDepotSeeder::class,
             // DepotSeeder::class,
             // StockSeeder::class,
@@ -27,6 +27,7 @@ class DatabaseSeeder extends Seeder
             // DemandeReservationSeeder::class,
             // DemandeChangementVinSeeder::class,
             // DemandeMotifSeeder::class,
+            //LivraisonSeeder::class,
         ]);
     }
 }

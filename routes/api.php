@@ -125,4 +125,6 @@ Route::prefix('integration')->middleware('integration.auth')->group(function () 
         // recherche ancien VIN (ou placeholder sans VIN) par identité véhicule
         Route::get('/old-vin', [StockController::class, 'getOldVinInStock']);
     });
+    // livraison — création depuis système externe (CRM/ERP)
+    Route::post('/livraison', [ExternalSyncController::class, 'storeLivraison']);
 });

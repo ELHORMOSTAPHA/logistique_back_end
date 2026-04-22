@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\DemandeMotif;
 use App\Models\DemandeReservation;
 use App\Models\Stock;
+use App\Http\Resources\Livraison\LivraisonResource;
+use App\Services\Livraison\LivraisonService;
 use App\Traits\ApiResponsable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,6 +16,10 @@ use Illuminate\Support\Facades\Storage;
 class ExternalSyncController extends Controller
 {
     use ApiResponsable;
+
+    public function __construct(
+        private readonly LivraisonService $livraisonService,
+    ) {}
 
     /**
      * Receive an order from SOUEAST-CRM and save it as a demande_reservation.
@@ -95,6 +101,48 @@ class ExternalSyncController extends Controller
         return response()->json([
             'message' => $demande->wasRecentlyCreated ? 'Demande créée.' : 'Demande mise à jour.',
             'data'    => $demande->load('demandeMotifs'),
+        ], $statusCode);
+    }
+
+    /**
+     * Reçoit une demande de livraison d'un système externe (CRM, ERP…).
+     *
+     * POST /api/integration/livraison
+     * Body: { vin, nom_client, tel_client, cmd_id }
+     *
+     * - Localise le stock par VIN.
+     * - Si une livraison active (en_attente / facturé) existe déjà pour ce stock → renvoie 200.
+     * - Sinon crée la livraison + entrée historique → renvoie 201.
+     * - VIN inconnu → 422.
+     */
+    public function storeLivraison(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'vin'        => 'required|string|max:45',
+            'nom_client' => 'required|string|max:255',
+            'tel_client' => 'nullable|string|max:50',
+            'cmd_id'     => 'nullable|string|max:100',
+        ]);
+
+        $result = $this->livraisonService->createFromIntegration($data);
+
+        if ($result['livraison'] === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Aucun véhicule trouvé pour ce VIN.',
+                'data'    => null,
+            ], 422);
+        }
+
+        $statusCode = $result['created'] ? 201 : 200;
+        $message    = $result['created']
+            ? 'Livraison créée avec succès.'
+            : 'Une livraison active existe déjà pour ce véhicule.';
+
+        return response()->json([
+            'success' => true,
+            'message' => $message,
+            'data'    => new LivraisonResource($result['livraison']),
         ], $statusCode);
     }
 }

@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Services\Stock;
 
 use App\Models\DepotHistorique;
@@ -478,9 +479,9 @@ class StockService
         $group1Ids = $group1->pluck('id')->all();
 
         $group3 = Stock::query()
-        ->whereHas('depot', function (Builder $q) {
-            $q->where('type_depot_id', self::ENTREE_STOCK_TYPE_DEPOT_ID);
-        })
+            ->whereHas('depot', function (Builder $q) {
+                $q->where('type_depot_id', self::ENTREE_STOCK_TYPE_DEPOT_ID);
+            })
             ->whereNotNull('vin')
             ->where('vin', '!=', '')
             ->where('reserved', false)
@@ -489,7 +490,6 @@ class StockService
             ->where('marque', 'like', '%' . $marque . '%')
             ->where(function ($q) use ($colorEx, $colorInt) {
                 $q->where('color_ex', 'like', '%' . $colorEx . '%')->orWhere('color_int', 'like', '%' . $colorInt . '%');
-                
             })
             ->orderBy('created_at', 'asc')
             ->get()
@@ -662,7 +662,7 @@ class StockService
                 $sameConfig->update(array_filter([
                     'combinaison_rare' => $rareValue,
                     'updated_by' => $userId,
-                ], static fn ($v) => $v !== null));
+                ], static fn($v) => $v !== null));
             }
 
             if (array_key_exists('depot_id', $payload)) {
