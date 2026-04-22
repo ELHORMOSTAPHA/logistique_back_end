@@ -9,6 +9,7 @@ use App\Models\DemandeReservation;
 use App\Models\Stock;
 use App\Services\Livraison\LivraisonService;
 use App\Traits\ApiResponsable;
+
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -28,30 +29,46 @@ class ExternalSyncController extends Controller
     public function syncCommande(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'numero_commande' => 'required|string|max:45',
-            'vin' => 'nullable|string|max:45',
-            'vendeur' => 'required|string|max:45',
-            'date_commande' => 'required|date_format:Y-m-d',
-            'date_livraison' => 'required|date_format:Y-m-d',
-            'net_a_payer' => 'required|numeric|min:0',
-            'statut' => 'sometimes|string|max:45',
-            'vehicle_marque' => 'nullable|string|max:100',
-            'vehicle_modele' => 'nullable|string|max:100',
-            'vehicle_finition' => 'nullable|string|max:100',
-            'vehicle_color_ex' => 'nullable|string|max:100',
-            'vehicle_color_int' => 'nullable|string|max:100',
-            'motifs' => 'sometimes|array',
-            'motifs.*.motifs_description' => 'nullable|string|max:45',
-            'motifs.*.file_path' => 'nullable|string|max:255',
-            'motifs.*.file_type' => 'nullable|string|max:45',
-            'motifs.*.file_content' => 'nullable|string',
-            'motifs.*.file_name' => 'nullable|string|max:255',
+            'numero_commande'              => 'required|string|max:45',
+            'vin'                          => 'nullable|string|max:45',
+            'id_stock'                     => 'nullable|integer',
+            'expose'                       => 'nullable|boolean',
+            'in_arrivage'                  => 'nullable|boolean',
+            'vendeur'                      => 'required|string|max:45',
+            'nom_client'                   => 'nullable|string|max:255',
+            'tel_client'                   => 'nullable|string|max:50',
+            'cmd_id'                       => 'nullable|string|max:100',
+            'date_commande'                => 'required|date_format:Y-m-d',
+            'date_livraison'               => 'required|date_format:Y-m-d',
+            'net_a_payer'                  => 'required|numeric|min:0',
+            'statut'                       => 'sometimes|string|max:45',
+            'vehicle_marque'               => 'nullable|string|max:100',
+            'vehicle_modele'               => 'nullable|string|max:100',
+            'vehicle_finition'             => 'nullable|string|max:100',
+            'vehicle_color_ex'             => 'nullable|string|max:100',
+            'vehicle_color_int'            => 'nullable|string|max:100',
+            'motifs'                       => 'sometimes|array',
+            'motifs.*.motifs_description'  => 'nullable|string|max:45',
+            'motifs.*.file_path'           => 'nullable|string|max:255',
+            'motifs.*.file_type'           => 'nullable|string|max:45',
+            'motifs.*.file_content'        => 'nullable|string',
+            'motifs.*.file_name'           => 'nullable|string|max:255',
         ]);
 
-        // Try to find matching stock by VIN — optional
-        $stock = ! empty($data['vin'])
-            ? Stock::where('vin', $data['vin'])->first()
-            : null;
+        // Find stock: prefer id_stock, fall back to VIN
+        $stock = null;
+        if (! empty($data['id_stock'])) {
+            $stock = Stock::find($data['id_stock']);
+        }
+        if ($stock === null && ! empty($data['vin'])) {
+            $stock = Stock::where('vin', $data['vin'])->first();
+        }
+
+        // Mark stock as reserved when found
+        if ($stock !== null) {
+            $stock->reserved = true;
+            $stock->save();
+        }
 
         // Always create/update the demande regardless of stock match
         $demande = DemandeReservation::updateOrCreate(
@@ -72,13 +89,27 @@ class ExternalSyncController extends Controller
             ]
         );
 
-        if (! empty($data['motifs'])) {
+        $livraison = null;
+        $statut = strtolower(trim((string) ($data['statut'] ?? '')));
+
+        if (in_array($statut, ['valider', 'valide', 'validé', 'validee', 'validée', 'accepté', 'accepte', 'acceptee', 'réservée', 'reservee'], true)) {
+            $livraisonResult = $this->livraisonService->createFromIntegration([
+                'vin'        => $data['vin'] ?? null,
+                'nom_client' => $data['nom_client'] ?? $data['vendeur'],
+                'tel_client' => $data['tel_client'] ?? null,
+                'cmd_id'     => $data['cmd_id'] ?? $data['numero_commande'],
+            ]);
+
+            $livraison = $livraisonResult['livraison'];
+        }
+
+        if (!empty($data['motifs'])) {
             $demande->demandeMotifs()->delete();
             foreach ($data['motifs'] as $motif) {
                 $storedPath = null;
 
-                if (! empty($motif['file_content']) && ! empty($motif['file_name'])) {
-                    $decoded = base64_decode($motif['file_content'], strict: true);
+                if (!empty($motif['file_content']) && !empty($motif['file_name'])) {
+                    $decoded = base64_decode(preg_replace('/\s+/', '', $motif['file_content']), true);
                     if ($decoded !== false) {
                         $ext = pathinfo($motif['file_name'], PATHINFO_EXTENSION);
                         $filename = 'demande_motifs/'.$demande->id.'_'.uniqid().($ext ? '.'.$ext : '');
@@ -114,7 +145,8 @@ class ExternalSyncController extends Controller
 
         return response()->json([
             'message' => $demande->wasRecentlyCreated ? 'Demande créée.' : 'Demande mise à jour.',
-            'data' => $demande->load('demandeMotifs'),
+            'data'    => $demande->load('demandeMotifs'),
+            'livraison' => $livraison ? new LivraisonResource($livraison) : null,
         ], $statusCode);
     }
 
@@ -132,7 +164,7 @@ class ExternalSyncController extends Controller
     public function storeLivraison(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'vin' => 'required|string|max:45',
+            'vin'        => 'nullable|string|max:45',
             'nom_client' => 'required|string|max:255',
             'tel_client' => 'nullable|string|max:50',
             'cmd_id' => 'nullable|string|max:100',

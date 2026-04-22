@@ -12,8 +12,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('livraisons', function (Blueprint $table) {
-            $table->string('ww', 50)->nullable()->comment('Numéro WW livraison')->after('statut');
-            $table->string('n_facture', 100)->nullable()->comment('Numéro de facture')->after('ww');
+            if (!Schema::hasColumn('livraisons', 'ww')) {
+                $table->string('ww', 50)->nullable()->comment('Numéro WW livraison')->after('statut');
+            }
+            if (!Schema::hasColumn('livraisons', 'n_facture')) {
+                $table->string('n_facture', 100)->nullable()->comment('Numéro de facture')->after('ww');
+            }
         });
     }
 
