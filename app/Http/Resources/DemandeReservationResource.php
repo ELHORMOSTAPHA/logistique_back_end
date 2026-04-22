@@ -32,7 +32,8 @@ class DemandeReservationResource extends JsonResource
             'deleted_at' => $this->deleted_at,
             'stock' => $this->stock,
             'demande_motifs' => $this->demandeMotifs,
-            'demande_changement_vins' => DemandeChangementVinResource::collection($this->whenLoaded('demandeChangementVins')),
+            'demande_modification_vins' => $this->demandeModificationVins->where('statut', 'en_attente')->values(),
+            // 'demande_changement_vins' => DemandeChangementVinResource::collection($this->whenLoaded('demandeChangementVins')),
         ];
     }
 }

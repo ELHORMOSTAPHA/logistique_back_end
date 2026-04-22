@@ -11,13 +11,16 @@ class StockStatus extends Model
 {
     use RecordsDeletedBy, SoftDeletes;
 
-    protected $table = 'stock_statuses';
+    protected $table = 'stock_statuts';
 
     public $timestamps = false;
 
     protected $fillable = [
-        'name',
-        'stock_status',
+       'libelle',
+       'deleted_by',
+       'deleted_at',
+       'created_at',
+       'updated_at',
     ];
 
     public function stocks(): HasMany

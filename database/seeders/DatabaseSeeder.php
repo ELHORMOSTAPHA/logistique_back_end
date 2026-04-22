@@ -19,13 +19,14 @@ class DatabaseSeeder extends Seeder
             ModulePermissionSeeder::class,
             UserSeeder::class,
             StockStatusSeeder::class,
-            DepotSeeder::class,
-            StockSeeder::class,
-            DepotHistoriqueSeeder::class,
-            HistoriqueSeeder::class,
-            DemandeReservationSeeder::class,
-            DemandeChangementVinSeeder::class,
-            DemandeMotifSeeder::class,
+            TypeDepotSeeder::class,
+            // DepotSeeder::class,
+            // StockSeeder::class,
+            // DepotHistoriqueSeeder::class,
+            // HistoriqueSeeder::class,
+            // DemandeReservationSeeder::class,
+            // DemandeChangementVinSeeder::class,
+            // DemandeMotifSeeder::class,
         ]);
     }
 }

@@ -19,6 +19,7 @@ class StoreDepotRequest extends FormRequest
         return [
             'name' => ['nullable', 'string', 'max:45'],
             'type' => ['nullable', 'string', 'max:45'],
+            'type_depot_id' => ['nullable', 'integer', 'exists:type_depots,id'],
         ];
     }
 }

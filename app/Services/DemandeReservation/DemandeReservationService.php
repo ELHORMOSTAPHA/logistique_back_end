@@ -10,6 +10,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use App\Http\Resources\DemandeReservationResource;
+
 class DemandeReservationService
 {
     /**
@@ -19,11 +20,11 @@ class DemandeReservationService
     public function list(array $query): array|Collection
     {
         $f = QueryFilterNormalizer::demandeReservation($query);
-        $builder = DemandeReservation::query()->with(['stock', 'demandeMotifs']);
+        $builder = DemandeReservation::query()->with(['stock', 'demandeMotifs', 'demandeModificationVins']);
 
         // Hide accepted demandes from the list by default
         if ($f['statut'] !== null) {
-            $builder->where('statut', 'like', '%'.addcslashes($f['statut'], '%_\\').'%');
+            $builder->where('statut', 'like', '%' . addcslashes($f['statut'], '%_\\') . '%');
         } else {
             $builder->where('statut', '!=', 'accepté');
         }
@@ -32,13 +33,13 @@ class DemandeReservationService
             $builder->where('stock_id', $f['stock_id']);
         }
         if ($f['id_demande'] !== null) {
-            $builder->where('id_demande', 'like', '%'.addcslashes($f['id_demande'], '%_\\').'%');
+            $builder->where('id_demande', 'like', '%' . addcslashes($f['id_demande'], '%_\\') . '%');
         }
         if ($f['nom_commercial'] !== null) {
-            $builder->where('nom_commercial', 'like', '%'.addcslashes($f['nom_commercial'], '%_\\').'%');
+            $builder->where('nom_commercial', 'like', '%' . addcslashes($f['nom_commercial'], '%_\\') . '%');
         }
         if ($f['keyword'] !== null) {
-            $like = '%'.addcslashes($f['keyword'], '%_\\').'%';
+            $like = '%' . addcslashes($f['keyword'], '%_\\') . '%';
             $builder->where(function ($q) use ($like) {
                 $q->where('demande_infos', 'like', $like)
                     ->orWhere('id_demande', 'like', $like)
@@ -62,7 +63,7 @@ class DemandeReservationService
         $pagination = $builder->paginate($f['per_page'], ['*'], 'page', $f['page'] ?? 1);
         // Ensure nested relations are attached to page items (avoids empty relations after paginate in some setups).
         $pagination->getCollection()->loadMissing(['stock', 'demandeMotifs']);
-        $pagination->through(fn (DemandeReservation $row) => (new DemandeReservationResource($row))->resolve());
+        $pagination->through(fn(DemandeReservation $row) => (new DemandeReservationResource($row))->resolve());
 
         return PaginationPayload::fromPaginator($pagination);
     }
@@ -83,7 +84,7 @@ class DemandeReservationService
             $row['statut'] = (string) $data['statut'];
         }
 
-        return DemandeReservation::query()->create(array_filter($row, static fn ($v) => $v !== null));
+        return DemandeReservation::query()->create(array_filter($row, static fn($v) => $v !== null));
     }
 
     public function find(int $id): ?DemandeReservation
@@ -153,17 +154,17 @@ class DemandeReservationService
                 'finition'      => $s->finition,
                 'color_ex'      => $s->color_ex,
                 'color_int'     => $s->color_int,
-                'stock_age_days'=> (int) $createdAt->diffInDays(now()),
+                'stock_age_days' => (int) $createdAt->diffInDays(now()),
                 'created_at'    => $s->created_at,
             ];
         };
 
-        $baseArrivage = fn () => Stock::query()
+        $baseArrivage = fn() => Stock::query()
             ->where('marque',   'like', '%' . $marque   . '%')
             ->where('modele',   'like', '%' . $modele   . '%')
             ->where('finition', 'like', '%' . $finition . '%')
             ->where('reserved', false)
-            ->where(fn ($q) => $q->whereNull('vin')->orWhere('vin', ''))
+            ->where(fn($q) => $q->whereNull('vin')->orWhere('vin', ''))
             ->orderBy('created_at', 'asc');
 
         // Priority 1: exact match on both colors
@@ -173,18 +174,19 @@ class DemandeReservationService
             ->get();
 
         if ($exact->isNotEmpty()) {
-            return $exact->map(fn ($s) => $toRow($s))->values()->all();
+            return $exact->map(fn($s) => $toRow($s))->values()->all();
         }
 
         // Priority 2: at least one color matches
         $partial = $baseArrivage()
-            ->where(fn ($q) => $q
-                ->where('color_ex',  'like', '%' . $colorEx  . '%')
-                ->orWhere('color_int', 'like', '%' . $colorInt . '%')
+            ->where(
+                fn($q) => $q
+                    ->where('color_ex',  'like', '%' . $colorEx  . '%')
+                    ->orWhere('color_int', 'like', '%' . $colorInt . '%')
             )
             ->get();
 
-        return $partial->map(fn ($s) => $toRow($s))->values()->all();
+        return $partial->map(fn($s) => $toRow($s))->values()->all();
     }
 
     /**
@@ -242,7 +244,7 @@ class DemandeReservationService
                 'color_ex'      => $s->color_ex,
                 'color_int'     => $s->color_int,
                 'reserved'      => (bool) $s->reserved,
-                'stock_age_days'=> (int) Carbon::parse($s->created_at)->diffInDays(now()),
+                'stock_age_days' => (int) Carbon::parse($s->created_at)->diffInDays(now()),
                 'created_at'    => $s->created_at,
             ];
         };
@@ -338,7 +340,10 @@ class DemandeReservationService
         if ($curlError || $httpCode < 200 || $httpCode >= 300) {
             Log::error(sprintf(
                 '[CrmSync] Failed to update VIN for order #%s in CRM. http=%s curl_err=%s body=%s',
-                $orderId, $httpCode, $curlError ?: '-', is_string($response) ? $response : 'null'
+                $orderId,
+                $httpCode,
+                $curlError ?: '-',
+                is_string($response) ? $response : 'null'
             ));
         } else {
             Log::info(sprintf('[CrmSync] Order #%s VIN set to "%s" in CRM. HTTP %s', $orderId, $vin, $httpCode));
@@ -381,7 +386,10 @@ class DemandeReservationService
         if ($curlError || $httpCode < 200 || $httpCode >= 300) {
             Log::error(sprintf(
                 '[CrmSync] Failed to update order #%s in CRM. http=%s curl_err=%s body=%s',
-                $orderId, $httpCode, $curlError ?: '-', is_string($response) ? $response : 'null'
+                $orderId,
+                $httpCode,
+                $curlError ?: '-',
+                is_string($response) ? $response : 'null'
             ));
         } else {
             Log::info(sprintf('[CrmSync] Order #%s status set to "%s" in CRM. HTTP %s', $orderId, $statut, $httpCode));

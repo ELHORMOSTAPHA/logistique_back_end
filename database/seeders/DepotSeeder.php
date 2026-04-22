@@ -14,9 +14,7 @@ class DepotSeeder extends Seeder
         $createdBy = $userId !== null ? (string) $userId : null;
 
         $depots = [
-            ['name' => 'Hub Casablanca', 'type' => 'stockage'],
-            ['name' => 'Showroom Rabat', 'type' => 'showroom'],
-            ['name' => 'Entrepôt Tanger', 'type' => 'stockage'],
+            ['name' => 'Port', 'type' => 'stockage'],
         ];
 
         foreach ($depots as $row) {

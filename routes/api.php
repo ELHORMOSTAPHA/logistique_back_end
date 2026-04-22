@@ -1,14 +1,18 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\DemandeModificationVinController;
 use App\Http\Controllers\Api\ExternalSyncController;
 use App\Http\Controllers\Api\DemandeReservationController;
 use App\Http\Controllers\Api\DepotController;
 use App\Http\Controllers\Api\HistoriqueController;
 use App\Http\Controllers\Api\IntegrationAuthController;
+use App\Http\Controllers\Api\LivraisonController;
 use App\Http\Controllers\Api\LotController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\StockController;
+use App\Http\Controllers\Api\StockStatusController;
+use App\Http\Controllers\Api\TypeDepotController;
 use App\Http\Controllers\Api\UtilisateurController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -40,12 +44,20 @@ Route::middleware('jwt.auth')->group(function () {
     Route::get('/auth/user', [AuthController::class, 'userDetails']);
     Route::get('/auth/me',   [AuthController::class, 'me']);
     // Stocks — CRUD: GET/POST /api/stocks, GET/PUT/PATCH/DELETE /api/stocks/{stock}
-    // Route::apiResource('stock', StockController::class);
+    Route::apiResource('stock', StockController::class);
     // Route::patch('stocks/{id}/depot', [StockController::class, 'changeDepot'])->whereNumber('id');
+    Route::get('stock/{stock}/depot-historique', [StockController::class, 'depotHistorique'])
+        ->whereNumber('stock');
+    Route::get('stock-statuses', [StockStatusController::class, 'index']);
+    Route::get('type-depots', [TypeDepotController::class, 'index']);
     Route::apiResource('stock', StockController::class);
     // Import JSON rows (client parses .xlsx / .csv / .ods)
     Route::post('stock/import-stock', [StockController::class, 'importStock']);
     Route::post('stock/import', [StockController::class, 'importStock']);
+    Route::post('stock/preview-vin-update', [StockController::class, 'previewVinUpdate']);
+    Route::post('stock/bulk-assign-lot', [StockController::class, 'bulkAssignLot']);
+    Route::post('stock/bulk-change-depot', [StockController::class, 'bulkChangeDepot']);
+    Route::post('stock/bulk-change-stock-status', [StockController::class, 'bulkChangeStockStatus']);
     //depot
     Route::apiResource('depot', DepotController::class);
     //historique
@@ -56,6 +68,15 @@ Route::middleware('jwt.auth')->group(function () {
     Route::post('demande_reservation/{demande_reservation}/affecter-vin',   [DemandeReservationController::class, 'affecterVin']);
     Route::get('demande_reservation/{demande_reservation}/matching-vin',    [DemandeReservationController::class, 'matchingVin']);
     Route::post('demande_reservation/{demande_reservation}/modifier-vin',   [DemandeReservationController::class, 'modifierVin']);
+    // Demandes de modification VIN (workflow admin)
+    // POST /demande_modification_vin — create a new request (called from the reservation workflow)
+    Route::post('demande_modification_vin',                                                    [DemandeModificationVinController::class, 'store']);
+    // Admin CRUD + actions (plural, hyphen — matches frontend service)
+    Route::get('demandes-modification-vin',                                                    [DemandeModificationVinController::class, 'index']);
+    Route::get('demandes-modification-vin/{demande_modification_vin}',                        [DemandeModificationVinController::class, 'show']);
+    Route::post('demandes-modification-vin/{demande_modification_vin}/valider',               [DemandeModificationVinController::class, 'approuver']);
+    Route::post('demandes-modification-vin/{demande_modification_vin}/refuser',               [DemandeModificationVinController::class, 'refuser']);
+    Route::delete('demandes-modification-vin/{demande_modification_vin}',                     [DemandeModificationVinController::class, 'destroy']);
     //utilisateur — routes dédiées avant apiResource (sinon "bulk-update-status" est pris pour un id)
     Route::post('utilisateur/bulk-update-status', [UtilisateurController::class, 'bulkUpdateStatus']);
     Route::apiResource('utilisateur', UtilisateurController::class);
@@ -64,7 +85,10 @@ Route::middleware('jwt.auth')->group(function () {
     Route::get('profile/{profile}/permissions', [ProfileController::class, 'permissions']);
     Route::put('profile/{profile}/permissions', [ProfileController::class, 'updatePermissions']);
     Route::apiResource('profile', ProfileController::class);
-
+    // Livraisons
+    Route::get('livraison/{id}/historiques',  [LivraisonController::class, 'historiques'])->whereNumber('id');
+    Route::post('livraison/{id}/historiques', [LivraisonController::class, 'addHistorique'])->whereNumber('id');
+    Route::apiResource('livraison', LivraisonController::class);
 });
 //to get brearer token lance this commande first
 #  php artisan integration:client:create "crm_exeedd" --scopes=integration.test --ttl=3600

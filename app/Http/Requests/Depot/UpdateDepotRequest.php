@@ -19,6 +19,7 @@ class UpdateDepotRequest extends FormRequest
         return [
             'name' => ['sometimes', 'nullable', 'string', 'max:45'],
             'type' => ['sometimes', 'nullable', 'string', 'max:45'],
+            'type_depot_id' => ['sometimes', 'nullable', 'integer', 'exists:type_depots,id'],
         ];
     }
 }

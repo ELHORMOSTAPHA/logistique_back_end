@@ -10,17 +10,14 @@ class StockStatusSeeder extends Seeder
     public function run(): void
     {
         $rows = [
-            ['name' => 'En fabrication', 'stock_status' => '1'],
-            ['name' => 'En acheminement', 'stock_status' => '2'],
-            ['name' => 'Arrivé au port', 'stock_status' => '3'],
-            ['name' => 'Entrée en stock', 'stock_status' => '4'],
+            ['libelle' => 'En fabrication'],
+            ['libelle' => 'En acheminement'],
+            ['libelle' => 'Arrivé au port'],
+            ['libelle' => 'Entrée en stock'],
         ];
 
         foreach ($rows as $row) {
-            DB::table('stock_statuses')->updateOrInsert(
-                ['name' => $row['name']],
-                ['stock_status' => $row['stock_status']]
-            );
+            DB::table('stock_statuts')->updateOrInsert(['libelle' => $row['libelle']], $row);
         }
     }
 }

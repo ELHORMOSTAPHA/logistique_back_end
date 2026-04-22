@@ -36,7 +36,7 @@ class DepotHistoriqueSeeder extends Seeder
                 'created_by' => $userId,
                 'stock_id' => $stock->id,
                 'depot_id' => $stock->depot_id,
-                'created_at' => now()->subDays(2)->toDateString(),
+                'created_at' => now()->subDays(2),
             ]);
         }
     }

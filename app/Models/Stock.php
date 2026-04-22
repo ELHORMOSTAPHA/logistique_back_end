@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\RecordsDeletedBy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Stock extends Model
@@ -34,6 +35,8 @@ class Stock extends Model
         'reserved',
         'depot_id',
         'stock_status_id',
+        'entree_stock_date',
+        'etat_avancement',
         'date_arrivage_prevu',//Date prévisionnelle de livraison
         'date_arrivage_reelle',//Date réelle de livraison
         'date_affectation',//Date réelle d'affectation
@@ -42,6 +45,10 @@ class Stock extends Model
         'statut',//etat d'avancement de la livraison
         'created_by',
         'deleted_by',
+        //combinaison rare
+        'combinaison_rare',
+        'expose',
+        'expose_date',
         'deleted_at',
         'updated_by',
     ];
@@ -49,6 +56,12 @@ class Stock extends Model
     protected $casts = [
         'reserved' => 'boolean',
         'expose'   => 'integer',
+        'combinaison_rare' => 'boolean',
+        'date_creation_commande' => 'date:Y-m-d',
+        'date_arrivage_prevu' => 'date:Y-m-d',
+        'date_arrivage_reelle' => 'date:Y-m-d',
+        'date_affectation' => 'date:Y-m-d',
+        // expose_date / entree_stock_date: pas de cast datetime — évite un décalage en lecture.
     ];
 
     // Relations
@@ -56,9 +69,25 @@ class Stock extends Model
     {
         return $this->belongsTo(Depot::class);
     }
+
+    /** Passages du véhicule par les dépôts (traçabilité). */
+    public function depotHistoriques(): HasMany
+    {
+        return $this->hasMany(DepotHistorique::class);
+    }
     public function stockStatus(): BelongsTo
     {
         return $this->belongsTo(StockStatus::class);
+    }
+
+    public function createdByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function updatedByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by');
     }
     // public function lot(): BelongsTo
     // {
@@ -67,6 +96,7 @@ class Stock extends Model
     //queries builder
     /**
      * Global keyword search across stock columns and related depot / lot fields (API `name` param).
+     * Inclut le n° de lot (`numero_lot`).
      */
     public function scopeFilterByName($query, string $name)
     {
@@ -82,6 +112,7 @@ class Stock extends Model
                 ->orWhere('finition', 'like', $like)
                 ->orWhere('vin', 'like', $like)
                 ->orWhere('numero_commande', 'like', $like)
+                ->orWhere('numero_lot', 'like', $like)
                 ->orWhere('color_ex', 'like', $like)
                 ->orWhere('color_ex_code', 'like', $like)
                 ->orWhere('color_int', 'like', $like)
