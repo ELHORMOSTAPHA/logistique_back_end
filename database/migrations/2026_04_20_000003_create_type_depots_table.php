@@ -8,10 +8,12 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('stock_statuts', function (Blueprint $table) {
+        Schema::create('type_depots', function (Blueprint $table) {
             $table->id();
-            $table->string('name', 45)->nullable();
-            $table->string('stock_status', 45)->nullable();
+            $table->string('libelle', 120);
+            $table->integer('created_by')->nullable();
+            $table->integer('updated_by')->nullable();
+            $table->timestamps();
             $table->softDeletes();
             $table->foreignId('deleted_by')->nullable()->constrained('users')->nullOnDelete();
         });
@@ -19,6 +21,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('stock_statuts');
+        Schema::dropIfExists('type_depots');
     }
 };

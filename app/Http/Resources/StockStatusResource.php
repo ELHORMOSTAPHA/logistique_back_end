@@ -14,8 +14,7 @@ class StockStatusResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'name' => $this->name,
-            'stock_status' => $this->stock_status,
+            'libelle' => $this->libelle,
             'deleted_by' => $this->deleted_by,
             'deleted_at' => $this->deleted_at,
             'stocks' => StockResource::collection($this->whenLoaded('stocks')),

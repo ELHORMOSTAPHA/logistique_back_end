@@ -18,7 +18,7 @@ class BulkChangeStockStatusRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'stock_status_id' => ['required', 'integer', 'exists:stock_statuses,id'],
+            'stock_status_id' => ['required', 'integer', 'exists:stock_statuts,id'],
             'select_all' => ['sometimes', 'boolean'],
             'excluded_ids' => ['nullable', 'array'],
             'excluded_ids.*' => ['integer'],

@@ -41,7 +41,7 @@ class UpdateStockRequest extends FormRequest
             'date_arrivage_reelle' => ['sometimes', 'nullable', 'date'],
             'date_affectation' => ['sometimes', 'nullable', 'date'],
             'depot_id' => ['sometimes', 'nullable', 'integer', 'exists:depots,id'],
-            'stock_status_id' => ['sometimes', 'nullable', 'integer', 'exists:stock_statuses,id'],
+            'stock_status_id' => ['sometimes', 'nullable', 'integer', 'exists:stock_statuts,id'],
             'statut' => ['sometimes', 'nullable', 'string', 'max:45'],
             'numero_lot' => ['sometimes', 'nullable', 'string', 'max:45'],
             'numero_arrivage' => ['sometimes', 'nullable', 'string', 'max:45'],

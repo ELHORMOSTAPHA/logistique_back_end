@@ -7,24 +7,21 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class StockStatus extends Model
+class TypeDepot extends Model
 {
     use RecordsDeletedBy, SoftDeletes;
 
-    protected $table = 'stock_statuts';
-
-    public $timestamps = false;
+    protected $table = 'type_depots';
 
     protected $fillable = [
-       'libelle',
-       'deleted_by',
-       'deleted_at',
-       'created_at',
-       'updated_at',
+        'libelle',
+        'created_by',
+        'deleted_by',
+        'updated_by',
     ];
 
-    public function stocks(): HasMany
+    public function depots(): HasMany
     {
-        return $this->hasMany(Stock::class);
+        return $this->hasMany(Depot::class);
     }
 }

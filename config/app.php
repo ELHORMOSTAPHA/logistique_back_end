@@ -63,9 +63,27 @@ return [
     | will be used by the PHP date and date-time functions. The timezone
     | is set to "UTC" by default as it is suitable for most use cases.
     |
+    | En pratique : `created_at`, `updated_at` (Eloquent) et `now()` en PHP
+    | utilisent ce fuseau IANA. Pour que phpMyAdmin et votre horloge Windows
+    | « affichent la même heure », réglez la même zone (Paramètres Windows)
+    | ou choisissez un identifiant IANA équivalent (ex. Africa/Casablanca
+    | pour le Maroc). Après changement de .env : php artisan config:clear.
+    |
     */
 
     'timezone' => env('APP_TIMEZONE', 'UTC'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Timezone for stock `expose_date` (showroom) only
+    |--------------------------------------------------------------------------
+    |
+    | Indépendant de APP_TIMEZONE : on peut garder created_at/updated_at en UTC
+    | tout en stocker une heure « mur » métier (ex. Maroc) pour expose_date.
+    |
+    */
+
+    'expose_date_timezone' => env('EXPOSE_DATE_TIMEZONE', 'Africa/Casablanca'),
 
     /*
     |--------------------------------------------------------------------------

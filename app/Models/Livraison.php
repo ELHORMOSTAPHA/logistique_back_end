@@ -14,6 +14,8 @@ class Livraison extends Model
     protected $fillable = [
         'stock_id',
         'client',
+        'telephone',
+        'crm_cmd_id',
         'statut', // en_attente, facturé, livré
         'ww',
         'n_facture',

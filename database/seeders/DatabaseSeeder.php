@@ -15,18 +15,19 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            ProfileSeeder::class,
-            ModulePermissionSeeder::class,
-            UserSeeder::class,
-            StockStatusSeeder::class,
-            DepotSeeder::class,
-            StockSeeder::class,
-            DepotHistoriqueSeeder::class,
-            HistoriqueSeeder::class,
-            DemandeReservationSeeder::class,
-            DemandeChangementVinSeeder::class,
-            DemandeMotifSeeder::class,
-            LivraisonSeeder::class,
+            // ProfileSeeder::class,
+            // ModulePermissionSeeder::class,
+            // UserSeeder::class,
+            // StockStatusSeeder::class,
+            TypeDepotSeeder::class,
+            // DepotSeeder::class,
+            // StockSeeder::class,
+            // DepotHistoriqueSeeder::class,
+            // HistoriqueSeeder::class,
+            // DemandeReservationSeeder::class,
+            // DemandeChangementVinSeeder::class,
+            // DemandeMotifSeeder::class,
+            //LivraisonSeeder::class,
         ]);
     }
 }
