@@ -456,6 +456,9 @@ class StockService
             });
 
         $group2 = Stock::query()
+            // ->whereHas('depot', function (Builder $q) {
+            //     $q->where('type_depot_id', self::ENTREE_STOCK_TYPE_DEPOT_ID);
+            // })
             ->where(function ($q) {
                 $q->whereNull('vin')->orWhere('vin', '');
             })
@@ -469,7 +472,7 @@ class StockService
             ->get()
             ->map(function (Stock $s) {
                 $s->setAttribute('in_arrivage', true);
-                $s->setAttribute('match_type', 'arrival');
+                $s->setAttribute('match_type', 'exact');
                 return $s;
             });
 
@@ -490,7 +493,6 @@ class StockService
             })
             ->orderBy('created_at', 'asc')
             ->get()
-            ->reject(fn(Stock $s) => in_array($s->id, $group1Ids, true))
             ->values()
             ->map(function (Stock $s) {
                 $s->setAttribute('in_arrivage', false);
@@ -551,8 +553,8 @@ class StockService
             ->where('color_ex', 'like', '%' . $colorEx . '%')
             ->where('color_int', 'like', '%' . $colorInt . '%')
             ->where('reserved', false)
-            ->where(fn($q) => $q->whereNull('expose')->orWhere('expose', '!=', 1))
-            ->whereDoesntHave('depot', fn($q) => $q->whereIn('type', ['showroom', 'quarantaine']))
+            // ->where(fn($q) => $q->whereNull('expose')->orWhere('expose', '!=', 1))
+            // ->whereDoesntHave('depot', fn($q) => $q->whereIn('type', ['showroom', 'quarantaine']))
             ->orderByRaw('entree_stock_date IS NULL ASC, entree_stock_date ASC');
 
         // Groupe 1 : VIN renseigné
