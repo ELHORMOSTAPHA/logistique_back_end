@@ -13,6 +13,7 @@ class OldVinInStockResource extends JsonResource
             'vin'         => $this->vin,
             'in_arrivage' => (bool) $this->in_arrivage,
             'expose' => (bool) $this->expose,
+            'id_stock' => $this->id,
         ];
     }
 }
