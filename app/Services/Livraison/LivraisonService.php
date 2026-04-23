@@ -206,10 +206,7 @@ class LivraisonService
     {
         $vin       = trim((string) ($data['vin'] ?? ''));
         $telephone = trim((string) ($data['tel_client'] ?? ''));
-        $client    = trim(implode(' — ', array_filter([
-            trim((string) ($data['nom_client'] ?? '')),
-            $telephone,
-        ])));
+        $client    = trim((string) ($data['nom_client'] ?? ''));
         $cmdId     = trim((string) ($data['cmd_id'] ?? ''));
 
         // Find stock by VIN first, then fall back to demande_reservation via cmd_id
