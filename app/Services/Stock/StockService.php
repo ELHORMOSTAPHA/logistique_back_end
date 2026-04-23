@@ -697,7 +697,9 @@ class StockService
         $keys = [];
         $rows = Stock::query()
             ->where('combinaison_rare', true)
-            ->get(['modele', 'marque', 'color_ex', 'color_int', 'finition']);
+            ->select(['modele', 'marque', 'finition', 'color_ex', 'color_int'])
+            ->distinct()
+            ->get();
 
         foreach ($rows as $row) {
             $keys[$this->configurationKey(
