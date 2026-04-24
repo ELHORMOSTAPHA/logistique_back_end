@@ -576,9 +576,6 @@ class StockService
             ->where(function ($q) {
                 $q->whereNull('vin')->orWhere('vin', '');
             })
-            ->whereHas('depot', function (Builder $q) {
-                $q->where('type_depot_id', self::ENTREE_STOCK_TYPE_DEPOT_ID);
-            })
             ->first();
 
         if ($stock) {
