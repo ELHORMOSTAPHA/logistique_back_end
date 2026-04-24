@@ -67,6 +67,8 @@ Route::middleware('jwt.auth')->group(function () {
     Route::get('demande_reservation/{demande_reservation}/matching-stock',  [DemandeReservationController::class, 'matchingStock']);
     Route::post('demande_reservation/{demande_reservation}/affecter-vin',   [DemandeReservationController::class, 'affecterVin']);
     Route::get('demande_reservation/{demande_reservation}/matching-vin',    [DemandeReservationController::class, 'matchingVin']);
+    Route::get('demande_reservation/matching-vin-by-stock/{stock}',         [DemandeReservationController::class, 'matchingVinByStock'])
+        ->whereNumber('stock');
     Route::post('demande_reservation/{demande_reservation}/modifier-vin',   [DemandeReservationController::class, 'modifierVin']);
     // Demandes de modification VIN (workflow admin)
     // POST /demande_modification_vin — create a new request (called from the reservation workflow)

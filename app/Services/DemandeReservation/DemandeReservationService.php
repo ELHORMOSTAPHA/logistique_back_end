@@ -271,6 +271,39 @@ class DemandeReservationService
     }
 
     /**
+     * Returns one stock row by ID for VIN affectation modal.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function getMatchingVinStockByStockId(int $stockId): ?array
+    {
+        $stock = Stock::query()->find($stockId);
+        if (! $stock) {
+            return null;
+        }
+
+        $entreeDate = $stock->entree_stock_date;
+
+        return [
+            'id'               => $stock->id,
+            'vin'              => $stock->vin,
+            'has_vin'          => ! empty($stock->vin),
+            'in_arrivage'      => false,
+            'marque'           => $stock->marque,
+            'modele'           => $stock->modele,
+            'finition'         => $stock->finition,
+            'color_ex'         => $stock->color_ex,
+            'color_int'        => $stock->color_int,
+            'reserved'         => (bool) $stock->reserved,
+            'entree_stock_date' => $entreeDate,
+            'stock_age_days'   => $entreeDate
+                ? (int) Carbon::parse($entreeDate)->diffInDays(now())
+                : (int) Carbon::parse($stock->created_at)->diffInDays(now()),
+            'created_at'       => $stock->created_at,
+        ];
+    }
+
+    /**
      * Change the VIN on an already-accepted demande and sync to CRM order_items.
      *
      * @param  array<string, mixed>  $data

@@ -129,6 +129,20 @@ class DemandeReservationController extends Controller
         }
     }
 
+    public function matchingVinByStock(int $stock): JsonResponse
+    {
+        try {
+            $stockRow = $this->demandeReservationService->getMatchingVinStockByStockId($stock);
+            if (! $stockRow) {
+                return $this->error(MessageKey::NOT_FOUND, null, 404);
+            }
+
+            return $this->success($stockRow, MessageKey::FETCHED);
+        } catch (\Exception $e) {
+            return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
+        }
+    }
+
     public function modifierVin(AffecterVinRequest $request, DemandeReservation $demande_reservation): JsonResponse
     {
         try {
