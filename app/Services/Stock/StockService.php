@@ -215,19 +215,17 @@ class StockService
             'stockStatus',
             'createdByUser',
             'updatedByUser',
+            'livraison',
         ]);
         $this->applyStockListFilters($queryBuilder, $f);
         $allowedSort = ['created_at', 'modele', 'vin', 'id'];
-        $sortBy = in_array($f['sort_by'], $allowedSort, true) ? $f['sort_by'] : 'created_at';
-        $order = in_array($f['sort_order'], ['asc', 'desc'], true) ? $f['sort_order'] : 'desc';
+        $sortBy = in_array($f['sort_by'], $allowedSort, true) ? $f['sort_by'] : 'id';
+        $order = in_array($f['sort_order'], ['asc', 'desc'], true) ? $f['sort_order'] : 'asc';
         $queryBuilder->orderBy($sortBy, $order);
-
         if ($f['paginated'] === false) {
             return $queryBuilder->get();
         }
-
         $pagination = $queryBuilder->paginate($f['per_page'], ['*'], 'page', $f['page'] ?? 1);
-
         return PaginationPayload::fromPaginator($pagination);
     }
 
@@ -828,7 +826,7 @@ class StockService
                 $missing = [];
                 foreach (
                     [
-                        'numero_commande' => 'N° cde',
+                        'numero_commande' => 'N° CDE',
                         'marque' => 'Marque',
                         'modele' => 'Modèle',
                         'finition' => 'Finition',
@@ -879,7 +877,7 @@ class StockService
             foreach (
                 [
                     'vin' => 'N° châssis',
-                    'numero_commande' => 'N° cde',
+                    'numero_commande' => 'N° CDE',
                     'marque' => 'Marque',
                     'modele' => 'Modèle',
                     'finition' => 'Finition',
@@ -998,6 +996,7 @@ class StockService
             'date_arrivage_prevu'      => 'date_arrivage_prevu',
             'date_arrivage_reelle'     => 'date_arrivage_reelle',
             'date_affectation'         => 'date_affectation',
+            'entree_stock_date'        => 'entree_stock_date',
             'depot_id'                 => 'depot_id',
             'stock_status_id'          => 'stock_status_id',
             'statut'                   => 'statut',

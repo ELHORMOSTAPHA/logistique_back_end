@@ -60,6 +60,7 @@ class StockResource extends JsonResource
                 'nom' => $this->createdByUser?->nom,
                 'prenom' => $this->createdByUser?->prenom,
             ]),
+            'livraison'=>$this->livraison,
             'updated_by_user' => $this->whenLoaded('updatedByUser', fn () => [
                 'id' => $this->updatedByUser?->id,
                 'nom' => $this->updatedByUser?->nom,

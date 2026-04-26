@@ -4,8 +4,10 @@ namespace App\Models;
 
 use App\Models\Concerns\RecordsDeletedBy;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Stock extends Model
@@ -89,6 +91,10 @@ class Stock extends Model
     {
         return $this->belongsTo(User::class, 'updated_by');
     }
+    public function livraison(): HasOne
+    {
+        return $this->hasOne(Livraison::class);
+    }
     // public function lot(): BelongsTo
     // {
     //     return $this->belongsTo(Lot::class);
@@ -127,9 +133,17 @@ class Stock extends Model
             });
         });
     }
+    /**
+     * Filtre sur `created_at` : bornes calendaires inclusives.
+     * Sans normalisation, une date `to` = `Y-m-d` devient minuit ce jour-là et exclut
+     * tout créé le même jour après 00:00:00 (ex. 21:40).
+     */
     public function scopeFilterByDate($query, $from, $to)
     {
-        return $query->whereBetween('created_at', [$from, $to]);
+        $start = Carbon::parse($from)->startOfDay();
+        $end = Carbon::parse($to)->endOfDay();
+
+        return $query->whereBetween('created_at', [$start, $end]);
     }
     public function scopeFilterByModele($query, $modele)
     {
