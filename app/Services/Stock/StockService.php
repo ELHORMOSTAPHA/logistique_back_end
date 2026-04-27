@@ -434,6 +434,7 @@ class StockService
         $finition = (string) $query['version'];
 
         $group1 = Stock::query()
+            ->with('depot.typeDepot')
             ->whereHas('depot', function (Builder $q) {
                 $q->where('type_depot_id', self::ENTREE_STOCK_TYPE_DEPOT_ID);
             })
@@ -450,10 +451,13 @@ class StockService
             ->map(function (Stock $s) {
                 $s->setAttribute('in_arrivage', false);
                 $s->setAttribute('match_type', 'exact');
+                $s->setAttribute('nom_depot', $s->depot?->name);
+                $s->setAttribute('type_depot', $s->depot?->typeDepot?->libelle);
                 return $s;
             });
 
         $group2 = Stock::query()
+            ->with('depot.typeDepot')
             // ->whereHas('depot', function (Builder $q) {
             //     $q->where('type_depot_id', self::ENTREE_STOCK_TYPE_DEPOT_ID);
             // })
@@ -471,12 +475,15 @@ class StockService
             ->map(function (Stock $s) {
                 $s->setAttribute('in_arrivage', true);
                 $s->setAttribute('match_type', 'exact');
+                $s->setAttribute('nom_depot', $s->depot?->name);
+                $s->setAttribute('type_depot', $s->depot?->typeDepot?->libelle);
                 return $s;
             });
 
         $group1Ids = $group1->pluck('id')->all();
 
         $group3 = Stock::query()
+            ->with('depot.typeDepot')
             ->whereHas('depot', function (Builder $q) {
                 $q->where('type_depot_id', self::ENTREE_STOCK_TYPE_DEPOT_ID);
             })
@@ -495,6 +502,8 @@ class StockService
             ->map(function (Stock $s) {
                 $s->setAttribute('in_arrivage', false);
                 $s->setAttribute('match_type', 'partial');
+                $s->setAttribute('nom_depot', $s->depot?->name);
+                $s->setAttribute('type_depot', $s->depot?->typeDepot?->libelle);
                 return $s;
             });
 
