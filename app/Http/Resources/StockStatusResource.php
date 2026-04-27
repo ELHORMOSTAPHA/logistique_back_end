@@ -15,6 +15,7 @@ class StockStatusResource extends JsonResource
         return [
             'id' => $this->id,
             'libelle' => $this->libelle,
+            'is_available_for_update' => $this->is_available_for_update,
             'deleted_by' => $this->deleted_by,
             'deleted_at' => $this->deleted_at,
             'stocks' => StockResource::collection($this->whenLoaded('stocks')),

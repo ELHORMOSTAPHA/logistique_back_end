@@ -10,10 +10,12 @@ class StockStatusSeeder extends Seeder
     public function run(): void
     {
         $rows = [
-            ['libelle' => 'En fabrication'],
-            ['libelle' => 'En acheminement'],
-            ['libelle' => 'Arrivé au port'],
-            ['libelle' => 'Entrée en stock'],
+            ['libelle' => 'En fabrication', 'is_available_for_update' => true],
+            ['libelle' => 'En acheminement', 'is_available_for_update' => true],
+            ['libelle' => 'Arrivé au port', 'is_available_for_update' => true],
+            ['libelle' => 'Entrée en stock', 'is_available_for_update' => true],
+            ['libelle' => 'Livrée', 'is_available_for_update' => false],
+            ['libelle' => 'Facturée', 'is_available_for_update' => false],
         ];
 
         foreach ($rows as $row) {

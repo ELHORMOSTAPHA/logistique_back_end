@@ -19,6 +19,7 @@ class StockStatusController extends Controller
     public function index(): JsonResponse
     {
         $rows = StockStatus::query()
+            ->where('is_available_for_update', true)
             ->orderBy('id')
             ->get(['id', 'libelle']);
 

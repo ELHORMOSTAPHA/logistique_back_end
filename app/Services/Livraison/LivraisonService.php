@@ -6,6 +6,7 @@ use App\Models\DemandeReservation;
 use App\Models\Livraison;
 use App\Models\LivraisonHistorique;
 use App\Models\Stock;
+use App\Models\StockStatus;
 use App\Support\PaginationPayload;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -152,10 +153,14 @@ class LivraisonService
 
             if ($data['statut'] === 'facturé' && ! empty($data['n_facture'])) {
                 $updatePayload['n_facture'] = $data['n_facture'];
+                // update the stock statut to facturé
+                $livraison->stock->update(['stock_status_id' => StockStatus::STATUS_FACTURE]);
             }
 
             if ($data['statut'] === 'livré' && ! empty($data['ww'])) {
                 $updatePayload['ww'] = $data['ww'];
+                // update the stock statut to livré
+                $livraison->stock->update(['stock_status_id' => StockStatus::STATUS_LIVREE]);
             }
 
             $livraison->update($updatePayload);
