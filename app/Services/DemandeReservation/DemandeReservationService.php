@@ -23,11 +23,20 @@ class DemandeReservationService
         $f = QueryFilterNormalizer::demandeReservation($query);
         $builder = DemandeReservation::query()->with(['stock', 'demandeMotifs', 'demandeModificationVins']);
 
-        // Hide accepted demandes from the list by default
         if ($f['statut'] !== null) {
             $builder->where('statut', 'like', '%' . addcslashes($f['statut'], '%_\\') . '%');
         } else {
-            $builder->where('statut', '!=', 'accepté');
+            // Keep accepted demandes visible until their stock is marked "Livrée"
+            $builder->where(function ($q) {
+                $q->where('statut', '!=', 'accepté')
+                  ->orWhere(function ($inner) {
+                      $inner->where('statut', 'accepté')
+                            ->whereHas('stock', fn ($sq) => $sq->whereHas(
+                                'stockStatus',
+                                fn ($ssq) => $ssq->where('libelle', 'not like', '%livr%')
+                            ));
+                  });
+            });
         }
 
         if ($f['stock_id'] !== null) {
