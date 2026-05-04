@@ -164,10 +164,13 @@ class ExternalSyncController extends Controller
     public function storeLivraison(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'vin'        => 'nullable|string|max:45',
-            'nom_client' => 'required|string|max:255',
-            'tel_client' => 'nullable|string|max:50',
-            'cmd_id' => 'nullable|string|max:100',
+            'vin'            => 'nullable|string|max:45',
+            'nom_client'     => 'required|string|max:255',
+            'tel_client'     => 'nullable|string|max:50',
+            'cmd_id'         => 'nullable|string|max:100',
+            'type_client'    => 'nullable|string|max:100',
+            'nom_commercial' => 'nullable|string|max:255',
+            'nom_succursale' => 'nullable|string|max:255',
         ]);
 
         $result = $this->livraisonService->createFromIntegration($data);

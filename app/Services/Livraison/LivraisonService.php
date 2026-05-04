@@ -209,10 +209,13 @@ class LivraisonService
      */
     public function createFromIntegration(array $data): array
     {
-        $vin       = trim((string) ($data['vin'] ?? ''));
-        $telephone = trim((string) ($data['tel_client'] ?? ''));
-        $client    = trim((string) ($data['nom_client'] ?? ''));
-        $cmdId     = trim((string) ($data['cmd_id'] ?? ''));
+        $vin           = trim((string) ($data['vin'] ?? ''));
+        $telephone     = trim((string) ($data['tel_client'] ?? ''));
+        $client        = trim((string) ($data['nom_client'] ?? ''));
+        $cmdId         = trim((string) ($data['cmd_id'] ?? ''));
+        $typeClient    = trim((string) ($data['type_client'] ?? ''));
+        $nomCommercial = trim((string) ($data['nom_commercial'] ?? ''));
+        $nomSuccursale = trim((string) ($data['nom_succursale'] ?? ''));
 
         // Find stock by VIN first, then fall back to demande_reservation via cmd_id
         $stock = null;
@@ -245,15 +248,18 @@ class LivraisonService
             return ['livraison' => $existing, 'created' => false, 'stock' => $stock];
         }
 
-        $livraison = DB::transaction(function () use ($stock, $client, $cmdId, $telephone) {
+        $livraison = DB::transaction(function () use ($stock, $client, $cmdId, $telephone, $typeClient, $nomCommercial, $nomSuccursale) {
             $livraison = Livraison::query()->create([
-                'stock_id'   => $stock->id,
-                'client'     => $client,
-                'telephone'  => $telephone !== '' ? $telephone : null,
-                'statut'     => 'en_attente',
-                'crm_cmd_id'  => $cmdId !== '' ? $cmdId : null,
-                'created_by' => null,
-                'updated_by' => null,
+                'stock_id'       => $stock->id,
+                'client'         => $client,
+                'telephone'      => $telephone !== '' ? $telephone : null,
+                'statut'         => 'en_attente',
+                'crm_cmd_id'     => $cmdId !== '' ? $cmdId : null,
+                'type_client'    => $typeClient !== '' ? $typeClient : null,
+                'nom_commercial' => $nomCommercial !== '' ? $nomCommercial : null,
+                'nom_succursale' => $nomSuccursale !== '' ? $nomSuccursale : null,
+                'created_by'     => null,
+                'updated_by'     => null,
             ]);
 
             LivraisonHistorique::query()->create([

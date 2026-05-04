@@ -16,6 +16,9 @@ class Livraison extends Model
         'client',
         'telephone',
         'crm_cmd_id',
+        'type_client',
+        'nom_commercial',
+        'nom_succursale',
         'statut', // en_attente, facturé, livré
         'ww',
         'n_facture',
