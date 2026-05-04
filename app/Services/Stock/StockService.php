@@ -4,6 +4,7 @@ namespace App\Services\Stock;
 
 use App\Models\DepotHistorique;
 use App\Models\Depot;
+use App\Models\Marque;
 use App\Models\Stock;
 use App\Models\TypeDepot;
 use App\Support\PaginationPayload;
@@ -23,6 +24,8 @@ class StockService
     private const DEFAULT_STOCK_STATUS_ID = 1;
     /** Dépôts `type_depot_id` = entrepôt (entrée stock) : statut + `entree_stock_date` (1ère fois). */
     private const ENTREE_STOCK_TYPE_DEPOT_ID = 1;
+    /** Ce type de dépôt exige un commentaire dans `depot_historiques` lors d’un transfert / affectation. */
+    private const DEPOT_HISTORIQUE_COMMENTAIRE_TYPE_DEPOT_ID = 3;
     private const ENTREE_STOCK_STATUS_ID = 4;
     private static bool $showroomTypeDepotIdResolved = false;
 
@@ -32,8 +35,16 @@ class StockService
     /**
      * Trace un passage du véhicule dans un dépôt lorsque `depot_id` change (ou première affectation).
      */
-    private function recordStockDepotHistorique(int $stockId, ?int $previousDepotId, ?int $newDepotId, ?int $userId): void
-    {
+    /**
+     * @param  non-empty-string|null  $commentaire  Stocké sur la ligne d’historique si ce type de dépôt l’exige.
+     */
+    private function recordStockDepotHistorique(
+        int $stockId,
+        ?int $previousDepotId,
+        ?int $newDepotId,
+        ?int $userId,
+        ?string $commentaire = null,
+    ): void {
         if ($newDepotId === null || $newDepotId < 1) {
             return;
         }
@@ -44,12 +55,45 @@ class StockService
         // Insertion SQL explicite : heure réelle (évite toute troncature côté cast).
         // La colonne doit être DATETIME (migration 2026_04_19_120000) — si elle reste en DATE, MySQL ne garde que le jour → 00:00:00.
         // Always store DB timestamps in UTC.
-        DB::table('depot_historiques')->insert([
+        $row = [
             'stock_id' => $stockId,
             'depot_id' => $newDepotId,
             'created_by' => $userId,
             'created_at' => Carbon::now('UTC')->format('Y-m-d H:i:s'),
-        ]);
+        ];
+        if ($commentaire !== null && $commentaire !== '') {
+            $row['commentaire'] = $commentaire;
+        }
+
+        DB::table('depot_historiques')->insert($row);
+    }
+
+    private function requiresDepotHistoriqueCommentaire(?int $depotId): bool
+    {
+        if ($depotId === null || $depotId < 1) {
+            return false;
+        }
+
+        $typeId = Depot::query()->whereKey($depotId)->value('type_depot_id');
+
+        return $typeId !== null && (int) $typeId === self::DEPOT_HISTORIQUE_COMMENTAIRE_TYPE_DEPOT_ID;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function extractDepotHistoriqueCommentaireFromPayload(array $data, int $newDepotId): ?string
+    {
+        if (! $this->requiresDepotHistoriqueCommentaire($newDepotId)) {
+            return null;
+        }
+        $raw = $data['commentaire'] ?? null;
+        if (! is_string($raw)) {
+            return null;
+        }
+        $t = trim($raw);
+
+        return $t === '' ? null : $t;
     }
 
     /**
@@ -245,8 +289,25 @@ class StockService
         if ($f['modele'] !== null) {
             $queryBuilder->filterByModele($f['modele']);
         }
+        if (! empty($f['marque_ids'])) {
+            $libelles = Marque::query()
+                ->whereIn('id', $f['marque_ids'])
+                ->pluck('libelle')
+                ->map(fn ($l) => is_string($l) ? trim($l) : '')
+                ->filter(fn (string $l) => $l !== '')
+                ->values()
+                ->all();
+            if ($libelles !== []) {
+                $queryBuilder->whereIn('marque', $libelles);
+            }
+        } elseif ($f['marque'] !== null) {
+            $queryBuilder->filterByMarque($f['marque']);
+        }
         if ($f['vin'] !== null) {
             $queryBuilder->where('vin', $f['vin']);
+        }
+        if ($f['stock_status_id'] !== null) {
+            $queryBuilder->where('stock_status_id', $f['stock_status_id']);
         }
         if ($f['reserved'] !== null) {
             $queryBuilder->filterByReserved($f['reserved']);
@@ -368,12 +429,15 @@ class StockService
                     'updated_by' => $userId,
                 ]);
             }
+            $histCommentaire = $this->extractDepotHistoriqueCommentaireFromPayload($data, $depotId);
+
             foreach ($stocks as $stock) {
                 $this->recordStockDepotHistorique(
                     (int) $stock->id,
                     $stock->depot_id !== null ? (int) $stock->depot_id : null,
                     $depotId,
                     $userId,
+                    $histCommentaire,
                 );
             }
 
@@ -397,12 +461,15 @@ class StockService
                 'updated_by' => $userId,
             ]);
         }
+        $histCommentaire = $this->extractDepotHistoriqueCommentaireFromPayload($data, $depotId);
+
         foreach ($stocks as $stock) {
             $this->recordStockDepotHistorique(
                 (int) $stock->id,
                 $stock->depot_id !== null ? (int) $stock->depot_id : null,
                 $depotId,
                 $userId,
+                $histCommentaire,
             );
         }
 
@@ -671,7 +738,16 @@ class StockService
 
             if (array_key_exists('depot_id', $payload)) {
                 $newDepotId = $payload['depot_id'] !== null ? (int) $payload['depot_id'] : null;
-                $this->recordStockDepotHistorique((int) $stock->id, $previousDepotId !== null ? (int) $previousDepotId : null, $newDepotId, $userId);
+                $histCommentaire = $newDepotId !== null
+                    ? $this->extractDepotHistoriqueCommentaireFromPayload($validated, $newDepotId)
+                    : null;
+                $this->recordStockDepotHistorique(
+                    (int) $stock->id,
+                    $previousDepotId !== null ? (int) $previousDepotId : null,
+                    $newDepotId,
+                    $userId,
+                    $histCommentaire,
+                );
             }
             return Stock::query()->find($id);
         } catch (\Exception $e) {
@@ -1273,6 +1349,7 @@ class StockService
                 'id' => $h->id,
                 'date' => $h->created_at !== null ? $h->created_at->format('Y-m-d') : null,
                 'at' => $h->created_at !== null ? $h->created_at->toIso8601String() : null,
+                'commentaire' => $h->commentaire !== null && $h->commentaire !== '' ? (string) $h->commentaire : null,
                 'depot' => $h->depot !== null ? [
                     'id' => $h->depot->id,
                     'name' => $h->depot->name,

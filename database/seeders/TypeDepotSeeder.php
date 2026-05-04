@@ -13,6 +13,7 @@ class TypeDepotSeeder extends Seeder
             ['libelle' => 'Stockage'],
             ['libelle' => 'Showroom'],
             ['libelle' => 'Quarantaine'],
+            ['libelle'=>'Evenement']
         ];
 
         foreach ($types as $row) {

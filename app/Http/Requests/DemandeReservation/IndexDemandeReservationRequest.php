@@ -35,6 +35,8 @@ class IndexDemandeReservationRequest extends FormRequest
     {
         return [
             'stock_id' => ['sometimes', 'nullable', 'integer', 'exists:stocks,id'],
+            'marque_ids' => ['sometimes', 'nullable', 'array'],
+            'marque_ids.*' => ['integer', 'exists:marques,id'],
             'statut' => ['sometimes', 'nullable', 'string', 'max:255'],
             'id_demande' => ['sometimes', 'nullable', 'string', 'max:255'],
             'nom_commercial' => ['sometimes', 'nullable', 'string', 'max:255'],

@@ -6,9 +6,9 @@ namespace App\Support;
  * Normalizes validated query strings for list endpoints (replaces List*Dto::fromArray).
  *
  * @phpstan-type StockFilters array{
- *   name: ?string, from: ?string, to: ?string, modele: ?string, vin: ?string,
- *   reserved: ?bool, depot_id: ?int, lot_id: ?int, per_page: int, page: ?int, sort_by: ?string,
- *   sort_order: ?string, paginated: ?bool
+ *   name: ?string, from: ?string, to: ?string, modele: ?string, marque: ?string, vin: ?string,
+ *   marque_ids: list<int>, reserved: ?bool, depot_id: ?int, lot_id: ?int, stock_status_id: ?int, per_page: int,
+ *   page: ?int, sort_by: ?string, sort_order: ?string, paginated: ?bool
  * }
  */
 final class QueryFilterNormalizer
@@ -29,6 +29,31 @@ final class QueryFilterNormalizer
 
         $per_page = isset($query['per_page']) ? min(100, max(1, (int) $query['per_page'])) : 15;
 
+        $stockStatusId = null;
+        if (array_key_exists('stock_status_id', $query) && $query['stock_status_id'] !== null && $query['stock_status_id'] !== '') {
+            $sid = (int) $query['stock_status_id'];
+            $stockStatusId = $sid > 0 ? $sid : null;
+        }
+
+        $marqueIds = [];
+        $marqueRaw = $query['marque_ids'] ?? null;
+        if (is_string($marqueRaw) && $marqueRaw !== '') {
+            foreach (explode(',', $marqueRaw) as $part) {
+                $mid = (int) trim($part);
+                if ($mid > 0) {
+                    $marqueIds[] = $mid;
+                }
+            }
+        } elseif (is_array($marqueRaw)) {
+            foreach ($marqueRaw as $id) {
+                $mid = (int) $id;
+                if ($mid > 0) {
+                    $marqueIds[] = $mid;
+                }
+            }
+        }
+        $marqueIds = array_values(array_unique($marqueIds));
+
         $sort_order = null;
         if (isset($query['sort_order']) && $query['sort_order'] !== '') {
             $sort_order = strtolower((string) $query['sort_order']);
@@ -39,10 +64,13 @@ final class QueryFilterNormalizer
             'from' => isset($query['from']) && $query['from'] !== '' ? (string) $query['from'] : null,
             'to' => isset($query['to']) && $query['to'] !== '' ? (string) $query['to'] : null,
             'modele' => isset($query['modele']) && $query['modele'] !== '' ? (string) $query['modele'] : null,
+            'marque' => isset($query['marque']) && $query['marque'] !== '' ? (string) $query['marque'] : null,
             'vin' => isset($query['vin']) && $query['vin'] !== '' ? (string) $query['vin'] : null,
             'reserved' => $reserved,
             'depot_id' => isset($query['depot_id']) && $query['depot_id'] !== '' ? (int) $query['depot_id'] : null,
             'lot_id' => isset($query['lot_id']) && $query['lot_id'] !== '' ? (int) $query['lot_id'] : null,
+            'stock_status_id' => $stockStatusId,
+            'marque_ids' => $marqueIds,
             'per_page' => $per_page,
             'page' => isset($query['page']) ? max(1, (int) $query['page']) : null,
             'sort_by' => isset($query['sort_by']) && $query['sort_by'] !== '' ? (string) $query['sort_by'] : null,
@@ -153,6 +181,24 @@ final class QueryFilterNormalizer
     public static function demandeReservation(array $query): array
     {
         $per_page = isset($query['per_page']) ? min(100, max(1, (int) $query['per_page'])) : 15;
+        $marqueIds = [];
+        $marqueRaw = $query['marque_ids'] ?? null;
+        if (is_string($marqueRaw) && $marqueRaw !== '') {
+            foreach (explode(',', $marqueRaw) as $part) {
+                $mid = (int) trim($part);
+                if ($mid > 0) {
+                    $marqueIds[] = $mid;
+                }
+            }
+        } elseif (is_array($marqueRaw)) {
+            foreach ($marqueRaw as $id) {
+                $mid = (int) $id;
+                if ($mid > 0) {
+                    $marqueIds[] = $mid;
+                }
+            }
+        }
+        $marqueIds = array_values(array_unique($marqueIds));
 
         $sort_order = null;
         if (isset($query['sort_order']) && $query['sort_order'] !== '') {
@@ -161,6 +207,7 @@ final class QueryFilterNormalizer
 
         return [
             'stock_id' => isset($query['stock_id']) && $query['stock_id'] !== '' ? (int) $query['stock_id'] : null,
+            'marque_ids' => $marqueIds,
             'statut' => isset($query['statut']) && $query['statut'] !== '' ? (string) $query['statut'] : null,
             'id_demande' => isset($query['id_demande']) && $query['id_demande'] !== '' ? (string) $query['id_demande'] : null,
             'nom_commercial' => isset($query['nom_commercial']) && $query['nom_commercial'] !== '' ? (string) $query['nom_commercial'] : null,

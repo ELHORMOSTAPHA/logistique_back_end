@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\HistoriqueController;
 use App\Http\Controllers\Api\IntegrationAuthController;
 use App\Http\Controllers\Api\LivraisonController;
 use App\Http\Controllers\Api\LotController;
+use App\Http\Controllers\Api\MarquesController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\StockController;
 use App\Http\Controllers\Api\StockStatusController;
@@ -60,6 +61,8 @@ Route::middleware('jwt.auth')->group(function () {
     Route::post('stock/bulk-change-stock-status', [StockController::class, 'bulkChangeStockStatus']);
     //depot
     Route::apiResource('depot', DepotController::class);
+    //marques
+    Route::get('marques', [MarquesController::class, 'index']);
     //historique
     Route::apiResource('historique', HistoriqueController::class);
     //demande_reservation

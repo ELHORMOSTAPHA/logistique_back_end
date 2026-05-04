@@ -18,6 +18,7 @@ class DepotHistorique extends Model
     protected $fillable = [
         'created_by',
         'stock_id',
+        'commentaire',
         'depot_id',
         'created_at',
     ];

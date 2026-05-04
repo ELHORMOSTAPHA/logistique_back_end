@@ -39,7 +39,11 @@ class IndexStockRequest extends FormRequest
     {
         return [
             'modele' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'marque' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'marque_ids' => ['sometimes', 'nullable', 'array'],
+            'marque_ids.*' => ['integer', 'exists:marques,id'],
             'vin' => ['sometimes', 'nullable', 'string', 'max:45'],
+            'stock_status_id' => ['sometimes', 'nullable', 'integer', 'exists:stock_statuts,id'],
             'reserved' => ['sometimes', 'nullable'],
             'depot_id' => ['sometimes', 'nullable', 'integer', 'exists:depots,id'],
             'lot_id' => ['sometimes', 'nullable', 'integer', 'exists:lots,id'],
