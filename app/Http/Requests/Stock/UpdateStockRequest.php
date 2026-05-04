@@ -2,7 +2,10 @@
 
 namespace App\Http\Requests\Stock;
 
+use App\Models\Depot;
+use App\Models\Stock;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class UpdateStockRequest extends FormRequest
 {
@@ -42,6 +45,7 @@ class UpdateStockRequest extends FormRequest
             'date_affectation' => ['sometimes', 'nullable', 'date'],
             'entree_stock_date' => ['sometimes', 'nullable', 'date'],
             'depot_id' => ['sometimes', 'nullable', 'integer', 'exists:depots,id'],
+            'commentaire' => ['sometimes', 'nullable', 'string', 'max:255'],
             'stock_status_id' => ['sometimes', 'nullable', 'integer', 'exists:stock_statuts,id'],
             'statut' => ['sometimes', 'nullable', 'string', 'max:45'],
             'numero_lot' => ['sometimes', 'nullable', 'string', 'max:45'],
@@ -49,6 +53,47 @@ class UpdateStockRequest extends FormRequest
             'lot_id' => ['sometimes', 'nullable', 'integer', 'exists:lots,id'],
             'combinaison_rare' => ['sometimes', 'boolean'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $v): void {
+            if (! $this->has('depot_id')) {
+                return;
+            }
+            $rawNew = $this->input('depot_id');
+            if ($rawNew === null || $rawNew === '') {
+                return;
+            }
+            $newDepotId = (int) $rawNew;
+            if ($newDepotId < 1) {
+                return;
+            }
+            $typeId = Depot::query()->whereKey($newDepotId)->value('type_depot_id');
+            if ((int) $typeId !== 3) {
+                return;
+            }
+
+            $param = $this->route('stock');
+            $stockId = is_object($param) && method_exists($param, 'getKey')
+                ? (int) $param->getKey()
+                : (int) $param;
+            if ($stockId < 1) {
+                return;
+            }
+
+            $previousDepotId = Stock::query()->whereKey($stockId)->value('depot_id');
+            $prev = $previousDepotId !== null ? (int) $previousDepotId : null;
+            if ($prev !== null && $prev === $newDepotId) {
+                return;
+            }
+
+            $commentaire = $this->input('commentaire');
+            $trimmed = is_string($commentaire) ? trim($commentaire) : '';
+            if ($trimmed === '') {
+                $v->errors()->add('commentaire', 'Le commentaire est obligatoire pour ce type de dépôt.');
+            }
+        });
     }
 
     /**
@@ -80,6 +125,7 @@ class UpdateStockRequest extends FormRequest
             'entree_stock_date' => 'date d’entrée en stock',
             'depot_id' => 'dépôt',
             'stock_status_id' => 'statut stock',
+            'commentaire' => 'commentaire',
             'statut' => 'statut livraison',
             'numero_lot' => 'numéro de lot',
             'numero_arrivage' => 'numéro d’arrivage',
@@ -105,6 +151,7 @@ class UpdateStockRequest extends FormRequest
             'depot_id.exists' => 'Le dépôt sélectionné est invalide ou n’existe plus.',
             'stock_status_id.exists' => 'Le statut stock sélectionné est invalide.',
             'lot_id.exists' => 'Le lot sélectionné est invalide.',
+            'commentaire.max' => 'Le commentaire ne doit pas dépasser :max caractères.',
         ];
     }
 }

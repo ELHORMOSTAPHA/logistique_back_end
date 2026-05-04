@@ -102,7 +102,7 @@ class Stock extends Model
     //queries builder
     /**
      * Global keyword search across stock columns and related depot / lot fields (API `name` param).
-     * Inclut le n° de lot (`numero_lot`).
+     * N'inclut pas marque / modèle (filtres dédiés).
      */
     public function scopeFilterByName($query, string $name)
     {
@@ -114,8 +114,7 @@ class Stock extends Model
         $like = '%'.addcslashes($name, '%_\\').'%';
 
         return $query->where(function ($q) use ($like, $name) {
-            $q->where('modele', 'like', $like)
-                ->orWhere('finition', 'like', $like)
+            $q->where('finition', 'like', $like)
                 ->orWhere('vin', 'like', $like)
                 ->orWhere('numero_commande', 'like', $like)
                 ->orWhere('numero_lot', 'like', $like)
@@ -148,6 +147,10 @@ class Stock extends Model
     public function scopeFilterByModele($query, $modele)
     {
         return $query->where('modele', 'like', '%'.$modele.'%');
+    }
+    public function scopeFilterByMarque($query, $marque)
+    {
+        return $query->where('marque', 'like', '%'.$marque.'%');
     }
     public function scopeFilterByVin($query, $vin)
     {

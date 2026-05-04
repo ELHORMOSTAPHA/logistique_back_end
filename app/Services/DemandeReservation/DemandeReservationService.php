@@ -3,6 +3,7 @@
 namespace App\Services\DemandeReservation;
 
 use App\Models\DemandeReservation;
+use App\Models\Marque;
 use App\Models\Stock;
 use App\Support\PaginationPayload;
 use App\Support\QueryFilterNormalizer;
@@ -31,6 +32,21 @@ class DemandeReservationService
 
         if ($f['stock_id'] !== null) {
             $builder->where('stock_id', $f['stock_id']);
+        }
+        if (!empty($f['marque_ids']) && is_array($f['marque_ids'])) {
+            $libelles = Marque::query()
+                ->whereIn('id', $f['marque_ids'])
+                ->pluck('libelle')
+                ->map(fn($l) => is_string($l) ? trim($l) : '')
+                ->filter(fn(string $l) => $l !== '')
+                ->values()
+                ->all();
+            if ($libelles !== []) {
+                $builder->where(function ($q) use ($libelles) {
+                    $q->whereHas('stock', fn($sq) => $sq->whereIn('marque', $libelles))
+                        ->orWhereIn('vehicle_marque', $libelles);
+                });
+            }
         }
         if ($f['id_demande'] !== null) {
             $builder->where('id_demande', 'like', '%' . addcslashes($f['id_demande'], '%_\\') . '%');
@@ -242,6 +258,7 @@ class DemandeReservationService
                 'marque'           => $s->marque,
                 'modele'           => $s->modele,
                 'finition'         => $s->finition,
+                'depot'            => $s->depot,
                 'color_ex'         => $s->color_ex,
                 'color_int'        => $s->color_int,
                 'reserved'         => (bool) $s->reserved,
