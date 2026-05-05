@@ -7,11 +7,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Depot\IndexDepotRequest;
 use App\Http\Requests\Depot\StoreDepotRequest;
 use App\Http\Requests\Depot\UpdateDepotRequest;
+use App\Http\Resources\DepotResource;
 use App\Models\Depot;
 use App\Services\Depot\DepotService;
 use App\Traits\ApiResponsable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Collection;
 
 class DepotController extends Controller
 {
@@ -29,6 +31,14 @@ class DepotController extends Controller
     {
         try {
             $depots = $this->depotService->list($request->validated());
+
+            if ($depots instanceof Collection) {
+                return $this->success(DepotResource::collection($depots), MessageKey::FETCHED);
+            }
+
+            if (is_array($depots) && array_key_exists('data', $depots)) {
+                $depots['data'] = DepotResource::collection(collect($depots['data']))->resolve();
+            }
 
             return $this->success($depots, MessageKey::FETCHED);
         } catch (\Exception $e) {

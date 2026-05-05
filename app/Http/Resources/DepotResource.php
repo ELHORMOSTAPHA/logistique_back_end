@@ -16,7 +16,7 @@ class DepotResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'type' => $this->type,
-            'type_depot_id' => $this->type_depot_id,
+            'type_depot_id' =>(int) $this->type_depot_id,
             'type_depot' => $this->whenLoaded('typeDepot', fn () => [
                 'id' => $this->typeDepot?->id,
                 'libelle' => $this->typeDepot?->libelle,
