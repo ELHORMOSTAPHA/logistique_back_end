@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CrmSoueastSyncController;
 use App\Http\Controllers\Api\DemandeModificationVinController;
 use App\Http\Controllers\Api\ExternalSyncController;
 use App\Http\Controllers\Api\DemandeReservationController;
@@ -132,4 +133,12 @@ Route::prefix('integration')->middleware('integration.auth')->group(function () 
     });
     // livraison — création depuis système externe (CRM/ERP)
     Route::post('/livraison', [ExternalSyncController::class, 'storeLivraison']);
+});
+
+// Cron-only routes — auth via secret partagé (header `X-Cron-Secret` ou `Authorization: Bearer <secret>`).
+// Le secret vient de la variable d'environnement `CRON_SECRET` (cf. config/crm_soueast.php).
+Route::prefix('cron')->middleware('cron.secret')->group(function () {
+    // Synchronisation référentiel véhicule depuis CRM SOUEAST.
+    // Met à jour : car_marques, car_modeles, car_finitions, crm_vehicules_colors.
+    Route::post('/sync/referentiel-vehicule', [CrmSoueastSyncController::class, 'syncReferentielVehicule']);
 });

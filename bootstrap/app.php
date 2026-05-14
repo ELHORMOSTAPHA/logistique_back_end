@@ -1,6 +1,7 @@
 <?php
 
 use App\Exceptions\Handler as AppExceptionHandler;
+use App\Http\Middleware\CronSecretMiddleware;
 use App\Http\Middleware\IntegrationAuthMiddleware;
 use App\Http\Middleware\ApiKeyMiddleware;
 use App\Http\Middleware\JwtAuthMiddleware;
@@ -22,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'jwt.auth' => JwtAuthMiddleware::class,
             'integration.auth' => IntegrationAuthMiddleware::class,
+            'cron.secret' => CronSecretMiddleware::class,
             'api.key'  => ApiKeyMiddleware::class,
         ]);
         $middleware->api(append: [
