@@ -16,7 +16,7 @@ class CrmVehiculeColor extends Model
         'reference',
         'prix',
         'modele_id',
-        'type',
+        'type',//int or ext
         'hex_color',
     ];
 
