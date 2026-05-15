@@ -15,12 +15,12 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            ProfileSeeder::class,
-            ModulePermissionSeeder::class,
-            UserSeeder::class,
-            StockStatusSeeder::class,
-            DepotSeeder::class,
-            TypeDepotSeeder::class,
+            // ProfileSeeder::class,
+            // ModulePermissionSeeder::class,
+            // UserSeeder::class,
+            // StockStatusSeeder::class,
+            // DepotSeeder::class,
+            // TypeDepotSeeder::class,
             CarMarqueSeeder::class,
             CarModeleSeeder::class,
             CarFinitionSeeder::class,

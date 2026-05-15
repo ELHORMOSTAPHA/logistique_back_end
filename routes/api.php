@@ -56,6 +56,7 @@ Route::middleware('jwt.auth')->group(function () {
     Route::post('stock/import-stock', [StockController::class, 'importStock']);
     Route::post('stock/import', [StockController::class, 'importStock']);
     Route::post('stock/preview-vin-update', [StockController::class, 'previewVinUpdate']);
+    Route::post('stock/validate-import-catalog', [StockController::class, 'validateImportCatalog']);
     Route::post('stock/bulk-assign-lot', [StockController::class, 'bulkAssignLot']);
     Route::post('stock/bulk-change-depot', [StockController::class, 'bulkChangeDepot']);
     Route::post('stock/bulk-change-stock-status', [StockController::class, 'bulkChangeStockStatus']);

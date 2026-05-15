@@ -14,6 +14,7 @@ use App\Http\Requests\Stock\listStockAproximit;
 use App\Http\Requests\Stock\PreviewVinUpdateRequest;
 use App\Http\Requests\Stock\StoreStockRequest;
 use App\Http\Requests\Stock\UpdateStockRequest;
+use App\Http\Requests\Stock\ValidateImportCatalogRequest;
 use App\Http\Resources\Stock\OldVinInStockResource;
 use App\Models\Stock;
 use App\Services\Stock\StockService;
@@ -101,6 +102,10 @@ class StockController extends Controller
             $this->audit('update', 'stocks', $id, null, $request->validated());
 
             return $this->success($stock, MessageKey::UPDATED);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            // Erreurs métier (catalogue marque/modèle/finition/couleurs) : on laisse
+            // Laravel répondre 422 avec le détail par champ pour le front.
+            throw $e;
         } catch (\Exception $e) {
             return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
         }
@@ -217,6 +222,25 @@ class StockController extends Controller
     {
         try {
             $data = $this->stockService->previewVinUpdate($request->validated('lines', []));
+
+            return $this->success($data, MessageKey::FETCHED);
+        } catch (\Exception $e) {
+            return $this->error(MessageKey::SERVER, $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Vérifie que marque / modèle / finition / couleurs de chaque ligne existent
+     * dans le catalogue (car_marques, car_modeles, car_finitions,
+     * crm_vehicules_colors) et sont cohérents (modèle ⊂ marque, etc.).
+     * Aucune écriture en base.
+     *
+     * POST /api/stock/validate-import-catalog
+     */
+    public function validateImportCatalog(ValidateImportCatalogRequest $request): JsonResponse
+    {
+        try {
+            $data = $this->stockService->validateImportCatalog($request->validated('lines', []));
 
             return $this->success($data, MessageKey::FETCHED);
         } catch (\Exception $e) {

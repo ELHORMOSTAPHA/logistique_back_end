@@ -2,6 +2,10 @@
 
 namespace App\Services\Stock;
 
+use App\Models\CarFinition;
+use App\Models\CarMarque;
+use App\Models\CarModele;
+use App\Models\CrmVehiculeColor;
 use App\Models\DepotHistorique;
 use App\Models\Depot;
 use App\Models\Marque;
@@ -15,6 +19,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class StockService
 {
@@ -701,6 +706,7 @@ class StockService
     {
         try {
             $stock = Stock::findOrFail($id);
+            $this->assertStockUpdateMatchesCatalog($stock, $validated);
             $previousDepotId = $stock->depot_id;
             $payload = $this->stockUpdateAttributes($validated);
             if (array_key_exists('depot_id', $payload)) {
@@ -750,8 +756,73 @@ class StockService
                 );
             }
             return Stock::query()->find($id);
+        } catch (ValidationException $e) {
+            // Préserver la 422 catalogue : ne pas masquer derrière un Exception générique.
+            throw $e;
         } catch (\Exception $e) {
             throw new \Exception($e->getMessage());
+        }
+    }
+
+    /**
+     * Vérifie qu'après application du payload d'update, la combinaison
+     * (marque, modèle, finition, color_ex, color_int) du véhicule reste valide
+     * dans le catalogue (car_marques / car_modeles / car_finitions /
+     * crm_vehicules_colors).
+     *
+     * Comportement :
+     *   - Aucun des 5 champs n'est touché ? On ne fait rien (mises à jour
+     *     d'autres champs ne déclenchent pas de re-validation).
+     *   - Un champ touché mais l'une des 5 valeurs effectives est vide ?
+     *     On ne fait rien (l'utilisateur peut volontairement effacer des champs
+     *     sur une ligne incomplète / legacy).
+     *   - Sinon, on charge l'index catalogue et on lève {@see ValidationException}
+     *     avec des erreurs par champ si la combinaison est inconsistante.
+     *
+     * @param  array<string, mixed>  $validated
+     *
+     * @throws ValidationException
+     */
+    private function assertStockUpdateMatchesCatalog(Stock $stock, array $validated): void
+    {
+        // Le request expose « version » comme alias historique de « finition ».
+        $normalized = $validated;
+        if (! array_key_exists('finition', $normalized) && array_key_exists('version', $normalized)) {
+            $normalized['finition'] = $normalized['version'];
+        }
+
+        $fields = ['marque', 'modele', 'finition', 'color_ex', 'color_int'];
+
+        $touched = false;
+        foreach ($fields as $field) {
+            if (array_key_exists($field, $normalized)) {
+                $touched = true;
+                break;
+            }
+        }
+
+        if (! $touched) {
+            return;
+        }
+
+        $combination = [];
+        foreach ($fields as $field) {
+            $combination[$field] = array_key_exists($field, $normalized)
+                ? $normalized[$field]
+                : $stock->{$field};
+        }
+
+        foreach ($fields as $field) {
+            $value = $combination[$field];
+            if ($value === null || (is_string($value) && trim($value) === '')) {
+                return;
+            }
+        }
+
+        $errors = $this->findCatalogCombinationErrors($combination, $this->loadCatalogIndex());
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
         }
     }
 
@@ -1207,6 +1278,220 @@ class StockService
         ];
     }
 
+    /**
+     * Vérifie chaque ligne d'import contre le catalogue véhicules :
+     *   - marque        ∈ car_marques.name
+     *   - modele        ∈ car_modeles.name (rattaché à la marque trouvée)
+     *   - finition      ∈ car_finitions.name (rattachée au modèle trouvé)
+     *   - color_ex      ∈ crm_vehicules_colors (modele_id du modèle, type='ext')
+     *   - color_int     ∈ crm_vehicules_colors (modele_id du modèle, type='int')
+     *
+     * Comparaisons : trim + case-insensitive (mb_strtolower) pour tolérer les
+     * petites variations de saisie utilisateur dans les fichiers Excel.
+     *
+     * Le catalogue est chargé une seule fois en mémoire pour servir N lignes.
+     *
+     * @param  array<int, array<string, mixed>>  $lines  Chaque entrée : line_no + champs import.
+     * @return array{
+     *     valid: array<int, array{line_no:int,row:array<string,mixed>}>,
+     *     invalid: array<int, array{line_no:int,row:array<string,mixed>,errors:array<int,string>}>,
+     *     summary: array{total:int, valid:int, invalid:int}
+     * }
+     */
+    public function validateImportCatalog(array $lines): array
+    {
+        $index = $this->loadCatalogIndex();
+
+        $valid = [];
+        $invalid = [];
+
+        foreach ($lines as $entry) {
+            $lineNo = (int) ($entry['line_no'] ?? 0);
+            $row = $entry;
+            unset($row['line_no']);
+
+            $errorsByField = $this->findCatalogCombinationErrors([
+                'marque' => $row['marque'] ?? null,
+                'modele' => $row['modele'] ?? null,
+                'finition' => $row['finition'] ?? null,
+                'color_ex' => $row['color_ex'] ?? null,
+                'color_int' => $row['color_int'] ?? null,
+            ], $index);
+
+            if ($errorsByField === []) {
+                $valid[] = [
+                    'line_no' => $lineNo,
+                    'row' => $row,
+                ];
+            } else {
+                $invalid[] = [
+                    'line_no' => $lineNo,
+                    'row' => $row,
+                    'errors' => array_values($errorsByField),
+                ];
+            }
+        }
+
+        return [
+            'valid' => $valid,
+            'invalid' => $invalid,
+            'summary' => [
+                'total' => count($lines),
+                'valid' => count($valid),
+                'invalid' => count($invalid),
+            ],
+        ];
+    }
+
+    /**
+     * Charge tout le catalogue véhicules en mémoire (4 tables) pour valider N
+     * lignes / un payload en une seule passe sans round-trips DB par appel.
+     *
+     * @return array{
+     *     marques: array<string, CarMarque>,
+     *     modelesByMarque: array<int, array<string, CarModele>>,
+     *     finitionsByModele: array<int, array<string, CarFinition>>,
+     *     colorsByModele: array<int, array<string, array<string, true>>>
+     * }
+     */
+    private function loadCatalogIndex(): array
+    {
+        $marques = [];
+        foreach (CarMarque::query()->get(['id', 'name']) as $marque) {
+            $key = $this->catalogKey((string) $marque->name);
+            if ($key !== '') {
+                $marques[$key] = $marque;
+            }
+        }
+
+        $modelesByMarque = [];
+        foreach (CarModele::query()->get(['id', 'name', 'marque_id']) as $modele) {
+            $key = $this->catalogKey((string) $modele->name);
+            if ($key === '') {
+                continue;
+            }
+            $modelesByMarque[(int) $modele->marque_id][$key] = $modele;
+        }
+
+        $finitionsByModele = [];
+        foreach (CarFinition::query()->get(['id', 'name', 'modele_id']) as $finition) {
+            $key = $this->catalogKey((string) $finition->name);
+            if ($key === '') {
+                continue;
+            }
+            $finitionsByModele[(int) $finition->modele_id][$key] = $finition;
+        }
+
+        // [modele_id][type ('ext'|'int')][normalizedName] => true
+        $colorsByModele = [];
+        foreach (CrmVehiculeColor::query()->get(['id', 'nom', 'modele_id', 'type']) as $color) {
+            $key = $this->catalogKey((string) $color->nom);
+            if ($key === '') {
+                continue;
+            }
+            $type = is_string($color->type) ? strtolower(trim($color->type)) : '';
+            $colorsByModele[(int) $color->modele_id][$type][$key] = true;
+        }
+
+        return [
+            'marques' => $marques,
+            'modelesByMarque' => $modelesByMarque,
+            'finitionsByModele' => $finitionsByModele,
+            'colorsByModele' => $colorsByModele,
+        ];
+    }
+
+    /**
+     * Vérifie une combinaison (marque, modèle, finition, color_ex, color_int)
+     * contre l'index catalogue préchargé. Retourne un dictionnaire d'erreurs
+     * keyé par champ (compatible avec ValidationException::withMessages).
+     *
+     * Le contrôle s'arrête à la première rupture de chaîne hiérarchique
+     * (pas de marque → on n'essaie pas le modèle ; pas de modèle → on n'essaie
+     * ni la finition ni les couleurs) pour éviter des messages bruyants.
+     *
+     * @param  array{marque:mixed,modele:mixed,finition:mixed,color_ex:mixed,color_int:mixed}  $combination
+     * @param  array<string, mixed>  $index  Résultat de {@see loadCatalogIndex()}
+     * @return array<string, string>
+     */
+    private function findCatalogCombinationErrors(array $combination, array $index): array
+    {
+        $errors = [];
+
+        $marqueInput = $this->trimString($combination['marque'] ?? null);
+        $modeleInput = $this->trimString($combination['modele'] ?? null);
+        $finitionInput = $this->trimString($combination['finition'] ?? null);
+        $colorExInput = $this->trimString($combination['color_ex'] ?? null);
+        $colorIntInput = $this->trimString($combination['color_int'] ?? null);
+
+        $marqueKey = $this->catalogKey($marqueInput);
+        $marque = $marqueKey !== '' ? ($index['marques'][$marqueKey] ?? null) : null;
+
+        if ($marque === null) {
+            $errors['marque'] = "Marque inconnue : « {$marqueInput} » (absente de marques).";
+
+            return $errors;
+        }
+
+        $modeleKey = $this->catalogKey($modeleInput);
+        $modele = $modeleKey !== ''
+            ? ($index['modelesByMarque'][(int) $marque->id][$modeleKey] ?? null)
+            : null;
+
+        if ($modele === null) {
+            $errors['modele'] = "Modèle « {$modeleInput} » introuvable pour la marque « {$marqueInput} ».";
+
+            return $errors;
+        }
+
+        $finitionKey = $this->catalogKey($finitionInput);
+        $finition = $finitionKey !== ''
+            ? ($index['finitionsByModele'][(int) $modele->id][$finitionKey] ?? null)
+            : null;
+
+        if ($finition === null) {
+            $errors['finition'] = "Finition « {$finitionInput} » introuvable pour le modèle « {$modeleInput} ».";
+        }
+
+        $modeleColors = $index['colorsByModele'][(int) $modele->id] ?? [];
+
+        $colorExKey = $this->catalogKey($colorExInput);
+        if ($colorExKey === '' || ! isset($modeleColors['ext'][$colorExKey])) {
+            $errors['color_ex'] = "Couleur extérieure « {$colorExInput} » non disponible pour le modèle « {$modeleInput} ».";
+        }
+
+        $colorIntKey = $this->catalogKey($colorIntInput);
+        if ($colorIntKey === '' || ! isset($modeleColors['int'][$colorIntKey])) {
+            $errors['color_int'] = "Couleur intérieure « {$colorIntInput} » non disponible pour le modèle « {$modeleInput} ».";
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Clé de comparaison catalogue : uppercase + suppression de TOUS les espaces
+     * (y compris insécables / tabulations). Garantit la robustesse aux différences
+     * de casse et d'espacement entre fichier Excel et base
+     * (ex. « Mercedes Benz » vs « MercedesBenz », « Class A » vs « CLASSA »).
+     */
+    private function catalogKey(?string $value): string
+    {
+        if ($value === null) {
+            return '';
+        }
+        $stripped = preg_replace('/\s+/u', '', $value);
+
+        return $stripped === null ? '' : mb_strtoupper($stripped);
+    }
+
+    private function trimString(mixed $value): string
+    {
+        if ($value === null) {
+            return '';
+        }
+
+        return trim((string) $value);
+    }
 
     /**
      * Map import keys to DB columns; omit empties. Dates normalized to Y-m-d.
